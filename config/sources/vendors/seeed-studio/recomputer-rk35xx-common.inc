@@ -569,3 +569,68 @@ function pre_umount_final_image__recomputer_armbianenv_backup() {
 		display_alert "$BOARD" "armbianEnv.txt.dist created"
 	fi
 }
+
+# Prune non-reComputer DTBs from the boot partition (SEEED_PRUNE_UNUSED_DTBS,
+# default yes). The vendor kernel package installs DTBs for every Rockchip
+# board under dtb-<ver>/rockchip/ (~590 files, ~117 MB); the bootscript only
+# ever loads one base DTB — the armbianEnv.txt fdtfile default or one of the
+# four EEPROM-selected reComputer variants (see boot-seeed-rk35xx.cmd) — plus
+# DT overlays from rockchip/overlay/. Keeps:
+#   - rk3576-/rk3588-recomputer-*.dtb variants only (covers fdtfile default +
+#     all EEPROM-mapped boards, including the rk3588 devkit variant this image
+#     can boot on; note recomputer sits mid-name, not as a prefix)
+#   - recomputer-/rk3576-/rk3588-*.dtbo overlays and rk35xx-* fixup scripts
+#     (the bootscript's full-name fallback path and the ${overlay_prefix}
+#     fixup applied on overlay error)
+# Runs at __890, before the OTA payload hooks (896/897/901), so boot.tar.gz
+# shrinks by the same ~29 MB (gzipped) it would otherwise carry on every push.
+# A dpkg path-exclude keeps future kernel package installs from restoring
+# the pruned files (a second full DTB set would also risk filling the boot
+# partition); include patterns precede the exclude because dpkg acts on the
+# first matching pattern.
+function pre_umount_final_image__890_recomputer_prune_unused_dtbs() {
+	if [[ "${SEEED_PRUNE_UNUSED_DTBS:-"yes"}" != "yes" ]]; then
+		display_alert "$BOARD" "Keeping full DTB set (SEEED_PRUNE_UNUSED_DTBS=no)" "info"
+		return 0
+	fi
+
+	local dtb_dir before_kb after_kb dtb_count ovl_count
+
+	for dtb_dir in "${MOUNT}"/boot/dtb-*/rockchip; do
+		[[ -d "${dtb_dir}" ]] || continue
+
+		before_kb="$(du -sk "${dtb_dir}" | cut -f1)"
+
+		dtb_count="$(find "${dtb_dir}" -maxdepth 1 -type f -name '*.dtb' \
+			! -name 'rk3576-recomputer-*.dtb' ! -name 'rk3588-recomputer-*.dtb' \
+			-print -delete | wc -l)"
+		ovl_count=0
+		if [[ -d "${dtb_dir}/overlay" ]]; then
+			ovl_count="$(find "${dtb_dir}/overlay" -maxdepth 1 -type f \
+				! -name 'recomputer-*' ! -name 'rk3576-*' ! -name 'rk3588-*' \
+				! -name 'rk35xx-*' ! -name 'README*' -print -delete | wc -l)"
+		fi
+
+		after_kb="$(du -sk "${dtb_dir}" | cut -f1)"
+		display_alert "$BOARD" "Pruned $(basename "$(dirname "${dtb_dir}")")/rockchip: ${before_kb}K -> ${after_kb}K (${dtb_count} DTBs, ${ovl_count} overlays removed)"
+	done
+
+	mkdir -p "${MOUNT}/etc/dpkg/dpkg.cfg.d"
+	# NOTE: heredoc body keeps a single tab (stripped by <<-) so the file
+	# lands with no leading whitespace — dpkg.cfg does not tolerate it
+	# ("unknown option ''"), unlike systemd units or apt sources.
+	cat > "${MOUNT}/etc/dpkg/dpkg.cfg.d/01-recomputer-prune-dtbs" <<-EOF
+	# Installed by the Armbian build (recomputer-rk35xx-common.inc).
+	# The boot partition keeps reComputer DTBs/overlays only; without
+	# this, kernel package installs restore ~117 MB of DTBs for every
+	# other Rockchip board on each kernel bump.
+	path-include=/boot/dtb-*/rockchip/rk3576-recomputer-*.dtb
+	path-include=/boot/dtb-*/rockchip/rk3588-recomputer-*.dtb
+	path-include=/boot/dtb-*/rockchip/overlay/recomputer-*.dtbo
+	path-include=/boot/dtb-*/rockchip/overlay/rk3576-*.dtbo
+	path-include=/boot/dtb-*/rockchip/overlay/rk3588-*.dtbo
+	path-include=/boot/dtb-*/rockchip/overlay/rk35xx-fixup.scr
+	path-exclude=/boot/dtb-*/rockchip/*
+	EOF
+	display_alert "$BOARD" "Installed dpkg path-exclude for non-reComputer DTBs" "info"
+}

@@ -19,8 +19,8 @@
 # hashing stays deterministic: a given armbian/build revision always resolves
 # to the same extension content. Bump the pin via a regular PR when Seeed
 # cuts a new release tag.
-SEEED_EXTENSION_REPO="https://github.com/Seeed-Studio/seeed_armbian_extension"
-SEEED_EXTENSION_REF="tag:v1.1"
+SEEED_EXTENSION_REPO="/home/mingzq/armbian/seeed_armbian_extension.w"   # LOCAL TEST
+SEEED_EXTENSION_REF="branch:review-ota"   # LOCAL TEST: uncommitted, tracks .w worktree
 
 # Board-family hooks (post_family_config__recomputer_stage_kernel_patches
 # and friends) check this variable to gate Seeed-specific behavior; export
@@ -54,7 +54,14 @@ if [[ "${CONFIG_DEFS_ONLY}" == "yes" ]]; then
 		seeed_ext_enable="no"
 	fi
 else
-	fetch_from_repo "${SEEED_EXTENSION_REPO}" "seeed_armbian_extension" "${SEEED_EXTENSION_REF}"
+	# LOCAL TEST: reuse the pre-synced cache checkout (seeed_armbian_extension
+	# under cache/sources) instead of fetching -- the .w worktree path is not
+	# visible inside the build container.
+	if [[ -d "${SRC}/cache/sources/seeed_armbian_extension/armbian-ota" ]]; then
+		display_alert "seeed-extension" "LOCAL TEST: using pre-synced cache checkout" "warn"
+	else
+		fetch_from_repo "${SEEED_EXTENSION_REPO}" "seeed_armbian_extension" "${SEEED_EXTENSION_REF}"
+	fi
 fi
 
 if [[ "${seeed_ext_enable}" == "yes" ]]; then

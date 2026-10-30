@@ -7,15 +7,16 @@ Backport from Rockchip SDK: handle 1/2/3 byte unaligned SFC writes by
 copying to an aligned temp buffer. Without this fix, usbplug fails to
 read SPI flash capability in Maskrom mode.
 
-Signed-off-by: Ming Zhangqun <north_sea@qq.com>
----
- drivers/rkflash/sfc.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+The unaligned-address and unaligned-size error guards apply only to the
+word-based FIFO path: DMA transfers prepare an aligned bounce buffer in
+bounce_buffer_start(), so they must not be rejected here.
 
+Signed-off-by: Ming Zhangqun <north_sea@qq.com>
 diff --git a/drivers/rkflash/sfc.c b/drivers/rkflash/sfc.c
+index a8fed5d30be..1b98fcc5cde 100644
 --- a/drivers/rkflash/sfc.c
 +++ b/drivers/rkflash/sfc.c
-@@ -84,6 +84,8 @@
+@@ -84,6 +84,8 @@ int sfc_request(struct rk_sfc_op *op, u32 addr, void *data, u32 size)
  	union SFCCMD_DATA cmd;
  	int reg;
  	int timeout = 0;
@@ -24,7 +25,7 @@ diff --git a/drivers/rkflash/sfc.c b/drivers/rkflash/sfc.c
  
  	reg = readl(g_sfc_reg + SFC_FSR);
  
-@@ -93,6 +95,22 @@
+@@ -93,6 +95,24 @@ int sfc_request(struct rk_sfc_op *op, u32 addr, void *data, u32 size)
  
  	cmd.d32 = op->sfcmd.d32;
  
@@ -36,10 +37,12 @@ diff --git a/drivers/rkflash/sfc.c b/drivers/rkflash/sfc.c
 +		else
 +			temp = ((u8 *)data)[0] | ((u8 *)data)[1] << 8 | ((u8 *)data)[2] << 16;
 +		p_data = &temp;
-+	} else if (size >= 4 && ((uintptr_t)data & 0x3)) {
++	} else if (!op->sfctrl.b.enbledma && size >= 4 &&
++		   ((uintptr_t)data & 0x3)) {
 +		printf("%s data addr unaligned access\n", __func__);
 +		return SFC_ERROR;
-+	} else if (size & 0x3 && cmd.b.rw == SFC_WRITE) {
++	} else if (!op->sfctrl.b.enbledma && size & 0x3 &&
++		   cmd.b.rw == SFC_WRITE) {
 +		printf("%s data size unaligned access\n", __func__);
 +		return SFC_ERROR;
 +	}
@@ -47,7 +50,7 @@ diff --git a/drivers/rkflash/sfc.c b/drivers/rkflash/sfc.c
  	if (cmd.b.addrbits == SFC_ADDR_XBITS) {
  		union SFCCTRL_DATA ctrl;
  
-@@ -155,7 +171,6 @@
+@@ -155,7 +175,6 @@ int sfc_request(struct rk_sfc_op *op, u32 addr, void *data, u32 size)
  	} else {
  		u32 i, words, count, bytes;
  		union SFCFSR_DATA    fifostat;

@@ -5,74 +5,110 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Seeed reComputer — Armbian 镜像下载</title>
 <style>
-  :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 15px/1.6 -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
-         background: #0f172a; color: #e2e8f0; }
-  main { max-width: 880px; margin: 0 auto; padding: 40px 20px 80px; }
-  h1 { font-size: 24px; margin: 0 0 4px; }
-  .sub { color: #94a3b8; margin-bottom: 8px; }
-  .tag { display: inline-block; background: rgba(34,211,238,.15); color: #22d3ee;
-          border: 1px solid rgba(34,211,238,.4); border-radius: 6px; padding: 1px 8px;
-          font: 12px/1.6 ui-monospace, monospace; }
-  section { margin-top: 44px; }
-  h2 { font-size: 18px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
-  .card { background: #131c31; border: 1px solid #1e293b; border-radius: 10px;
-           padding: 12px 16px; margin: 12px 0; }
-  .card-title { font-weight: 600; margin-bottom: 6px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip, .od { display: inline-block; padding: 3px 12px; border-radius: 999px;
-          border: 1px solid #334155; color: #cbd5e1; text-decoration: none; font-size: 13px; }
-  .chip.img { border-color: rgba(52,211,153,.5); color: #34d399; }
-  .chip:hover, .od:hover { background: #1e293b; }
-  .od { margin-top: 10px; display: inline-block; border-color: rgba(96,165,250,.5); color: #60a5fa; }
-  footer { margin-top: 60px; color: #64748b; font-size: 13px; }
-  footer code { background: #1e293b; padding: 1px 6px; border-radius: 4px; }
+  body { margin: 0; font: 15px/1.65 -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+         background: #f3f5f8; color: #03353f; }
+  header { background: #03353f; color: #fff; padding: 34px 0 30px; }
+  header .bar { width: 56px; height: 5px; background: #8dc215; border-radius: 3px;
+                 margin-bottom: 16px; }
+  main { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .5px; }
+  h1 em { color: #8dc215; font-style: normal; }
+  .sub { color: #b9cdd4; font-size: 14px; }
+  .tag { display: inline-block; background: rgba(141,194,21,.18); color: #8dc215;
+          border: 1px solid rgba(141,194,21,.55); border-radius: 6px; padding: 0 8px;
+          font: 12px/1.7 ui-monospace, "SF Mono", monospace; }
+  .board { display: flex; gap: 26px; background: #fff; border-radius: 14px;
+            padding: 24px; margin: 22px 0; box-shadow: 0 1px 4px rgba(3,53,63,.08); }
+  .photo { flex: 0 0 300px; }
+  .photo img { width: 100%; border-radius: 10px; background: #fff; mix-blend-mode: multiply; }
+  .photo.noimg { display: none; }
+  .info { flex: 1; min-width: 0; }
+  h2 { font-size: 20px; margin: 2px 0 14px; }
+  h2 span { color: #8dc215; }
+  .row { display: flex; align-items: baseline; gap: 14px; padding: 9px 0;
+          border-top: 1px solid #eef2f6; flex-wrap: wrap; }
+  .row-title { flex: 0 0 64px; font-weight: 600; font-size: 14px; }
+  .row-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge { font-size: 11px; border-radius: 4px; padding: 0 6px; margin-left: 6px;
+            vertical-align: 2px; }
+  .badge.ab { background: rgba(255,188,68,.18); color: #b96e00; border: 1px solid rgba(255,188,68,.6); }
+  .badge.crypt { background: rgba(3,53,63,.08); color: #03353f; border: 1px solid rgba(3,53,63,.25); }
+  .btn { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px;
+          text-decoration: none; color: #03353f; border: 1px solid #d7dee5; background: #fff; }
+  .btn.primary { background: #8dc215; border-color: #8dc215; color: #fff; font-weight: 600; }
+  .btn:hover { filter: brightness(.96); }
+  .onedrive { display: inline-block; margin-top: 14px; text-decoration: none; font-size: 14px;
+               color: #03353f; border: 1px dashed #8dc215; border-radius: 8px; padding: 5px 14px; }
+  footer { margin: 40px 0 60px; color: #7b8fa0; font-size: 13px; line-height: 2; }
+  footer code { background: #e8edf2; padding: 1px 7px; border-radius: 4px; font-size: 12px; }
+  @media (max-width: 720px) { .board { flex-direction: column; } .photo { flex: none; } }
 </style>
 </head>
 <body>
+<header><main>
+  <div class="bar"></div>
+  <h1>Seeed <em>reComputer</em> — Armbian 镜像</h1>
+  <div class="sub">当前正式版 <span class="tag">261031-1200</span> &nbsp;·&nbsp; 2026-10-31 08:00 UTC</div>
+</main></header>
 <main>
-  <h1>Seeed reComputer — Armbian 镜像</h1>
-  <div class="sub">当前正式版 <span class="tag">261031-1200</span> · 生成于 2026-10-31 08:00 UTC</div>
-  
-    <section id="rk3576-devkit">
-      <h2>reComputer rk3576-devkit</h2>
-      
-        <div class="card">
-          <div class="card-title">CLI</div>
-          <div class="chips"><a class="chip img" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/Armbian-unofficial_26.11.0-trunk_Recomputer-rk3576-devkit_noble_vendor_6.1.172_minimal.img.xz">镜像 · 1.2G</a><a class="chip" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…sha256">sha256</a><a class="chip" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…txt">构建信息</a><a class="chip img" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…OTA.tar.gz">OTA 包 · 3.3G</a><a class="chip" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…OTA.checksums">校验</a></div>
+
+  <section class="board">
+    <div class="photo">
+      <img src="https://armbian.com/api/v1/images/boards/480/recomputer-rk3576-devkit.png" alt="reComputer rk3576-devkit" loading="lazy"
+           onerror="this.closest('.photo').classList.add('noimg')">
+    </div>
+    <div class="info">
+      <h2>reComputer <span>rk3576-devkit</span></h2>
+      <div class="downloads">
+        <div class="row">
+          <div class="row-title">CLI</div>
+          <div class="row-links"><a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/Armbian-unofficial_26.11.0-trunk_Recomputer-rk3576-devkit_noble_vendor_6.1.172_minimal.img.xz">镜像 · 1.2G</a><a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…OTA.tar.gz">OTA 包 · 3.3G</a><a class="btn" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…sha256">sha256</a><a class="btn" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…OTA.checksums">校验</a><a class="btn" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…txt">构建信息</a></div>
         </div>
-        <div class="card">
-          <div class="card-title">桌面</div>
-          <div class="chips"><a class="chip img" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…1.part">镜像 ×2 分片 · 2.4G</a><a class="chip" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…sha256">sha256</a></div>
+        <div class="row">
+          <div class="row-title">桌面</div>
+          <div class="row-links"><a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…1.part">镜像（分片） ×2 · 2.4G</a><a class="btn" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…sha256">sha256</a></div>
+        </div></div>
+      <a class="onedrive" href="https://1drv.ms/f/c/8010e556360efa2b/IgDtH1ct5SRzSb9FXRqg9l7nAewGGj-3L5zeg0nlphgAr4I?e=twPqnn">☁ OneDrive 下载全部</a>
+    </div>
+  </section>
+  <section class="board">
+    <div class="photo">
+      <img src="https://armbian.com/api/v1/images/boards/480/recomputer-rk3576-industrial.png" alt="reComputer rk3576-industrial" loading="lazy"
+           onerror="this.closest('.photo').classList.add('noimg')">
+    </div>
+    <div class="info">
+      <h2>reComputer <span>rk3576-industrial</span></h2>
+      <div class="downloads">
+        <div class="row">
+          <div class="row-title">桌面<span class="badge crypt">加密</span></div>
+          <div class="row-links"><a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…crypt.img.xz">镜像 · 2.3G</a><a class="btn" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…">sha256</a></div>
+        </div></div>
+      <a class="onedrive" href="https://1drv.ms/f/c/8010e556360efa2b/IgDtH1ct5SRzSb9FXRqg9l7nAewGGj-3L5zeg0nlphgAr4I?e=twPqnn">☁ OneDrive 下载全部</a>
+    </div>
+  </section>
+  <section class="board">
+    <div class="photo">
+      <img src="https://armbian.com/api/v1/images/boards/480/recomputer-rk3588-devkit.png" alt="reComputer rk3588-devkit" loading="lazy"
+           onerror="this.closest('.photo').classList.add('noimg')">
+    </div>
+    <div class="info">
+      <h2>reComputer <span>rk3588-devkit</span></h2>
+      <div class="downloads">
+        <div class="row">
+          <div class="row-title">CLI<span class="badge ab">A/B</span></div>
+          <div class="row-links"><a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588ab.img.xz">镜像 · 1.2G</a><a class="btn" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588ab.sha">sha256</a></div>
         </div>
-      <a class="od" href="https://1drv.ms/f/c/8010e556360efa2b/IgDtH1ct5SRzSb9FXRqg9l7nAewGGj-3L5zeg0nlphgAr4I?e=twPqnn">OneDrive 镜像 →</a>
-    </section>
-    <section id="rk3576-industrial">
-      <h2>reComputer rk3576-industrial</h2>
-      
-        <div class="card">
-          <div class="card-title">桌面 · 加密</div>
-          <div class="chips"><a class="chip img" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…crypt.img.xz">镜像 · 2.3G</a><a class="chip" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/…">sha256</a></div>
-        </div>
-      <a class="od" href="https://1drv.ms/f/c/8010e556360efa2b/IgDtH1ct5SRzSb9FXRqg9l7nAewGGj-3L5zeg0nlphgAr4I?e=twPqnn">OneDrive 镜像 →</a>
-    </section>
-    <section id="rk3588-devkit">
-      <h2>reComputer rk3588-devkit</h2>
-      
-        <div class="card">
-          <div class="card-title">CLI · A/B</div>
-          <div class="chips"><a class="chip img" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588ab.img.xz">镜像 · 1.2G</a><a class="chip" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588ab.sha">sha256</a></div>
-        </div>
-        <div class="card">
-          <div class="card-title">桌面</div>
-          <div class="chips"><a class="chip img" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588.img.xz">镜像 · 2.0G</a><a class="chip" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588.sha">sha256</a></div>
-        </div>
-      <a class="od" href="https://1drv.ms/f/c/8010e556360efa2b/IgDtH1ct5SRzSb9FXRqg9l7nAewGGj-3L5zeg0nlphgAr4I?e=twPqnn">OneDrive 镜像 →</a>
-    </section>
+        <div class="row">
+          <div class="row-title">桌面</div>
+          <div class="row-links"><a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588.img.xz">镜像 · 2.0G</a><a class="btn" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/download/261031-1200/rk3588.sha">sha256</a></div>
+        </div></div>
+      <a class="onedrive" href="https://1drv.ms/f/c/8010e556360efa2b/IgDtH1ct5SRzSb9FXRqg9l7nAewGGj-3L5zeg0nlphgAr4I?e=twPqnn">☁ OneDrive 下载全部</a>
+    </div>
+  </section>
   <footer>
-    分片（&gt;2 GiB）下载后执行 <code>cat 文件名.*.part &gt; 文件名</code> 重组，再用同名 sha256 校验。<br>
-    镜像写入：<code>xz -d -T0 xxx.img.xz</code> 后 <code>dd</code> / balenaEtcher 写入 eMMC/SD。
+    分片（&gt;2 GiB）下载后：<code>cat 文件名.*.part &gt; 文件名</code> 重组，再用同名 sha256 校验。<br>
+    写入 eMMC/SD：<code>xz -d -T0 xxx.img.xz</code> 后用 <code>dd</code> 或 balenaEtcher 烧写。
   </footer>
 </main>
 </body>

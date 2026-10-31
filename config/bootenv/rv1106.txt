@@ -1,3 +1,0 @@
-verbosity=1
-extraargs=coherent_pool=2M cma=0 video=off udev.children-max=1
-bootlogo=false

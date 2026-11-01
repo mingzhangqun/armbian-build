@@ -75,9 +75,12 @@
   .row-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
   .row-title { font-weight: 700; font-size: 14px; }
   .row-meta { color: #7b8fa0; font-size: 12.5px; }
+  .row-info { color: #7b8fa0; font-size: 12.5px; text-decoration: underline;
+              text-decoration-style: dotted; margin-left: 8px; }
+  .row-info:hover { color: #2c6fbf; }
   .row-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   /* button groups separated by a vertical rule:
-     [Image sha256] | [OTA checksum] | [Build info] */
+     [Image sha256] | [OTA checksum] */
   .grp { display: inline-flex; flex-wrap: wrap; gap: 8px; }
   .grp + .grp { margin-left: 10px; padding-left: 12px; border-left: 1px solid #d7dee5; }
   .badge { font-size: 11px; border-radius: 4px; padding: 0 6px; margin-left: 6px;
@@ -163,16 +166,17 @@ const CFG = Object.freeze({ repo: "mingzhangqun/armbian-build", onedrive: "https
 // Build-time: build job generates links__<board>__<entry>.json with
 // rclone link for each uploaded file. Page renders directly from this
 // embedded data — no runtime OneDrive API calls needed.
-const LINKS = {"recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.xz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAR6rjDP030SaXeWWkz8fUqAapQXh9rWhc8y33zl6SIep0", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.xz.sha256": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQA-4zKosYgKRKfXnQrqMjLwAQBpGNT20b39CONv0fwAXK8", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.sha": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQCE2LJJKk2-Tou3VKgPQu60AQFAlmIy6Q_y3I0B3KYA_Ck", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.txt": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDtZvKB5prQRokVBSkP2MJhARX8dpci1dqS015KlrQiPWw", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal_OTA.checksums": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQBC1AKgrxNpRLHdsZGmJGE0AdSgnOk6uomu5qWOBrToXIw", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal_OTA.tar.gz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDtmx9LPeg3TZKb5HX7fSxhAXxMZ9JT-1J4kTpjA9IF41U", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDxk2pMB_1VRq32voUdO-aXAZH6EMKDrj45JThSGCxOkNA", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz.sha256": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAnPa7IlpMmQbt5n_5D_1voAc-dPYyObPPyuEk7hfxT88A", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.sha": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDL4euVx1LRSKWwl5ZPZVv9AbwlB11fU5V0aR9Zy7l7I4c", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.txt": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQBf3WXkrZOiT4yXEmWt24VGAeQN7pMlQTsneqo-dsmmpVw", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_OTA.checksums": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQCuUc2MMER8T7MY7VQRfyP7AaHq2twe7-gIKZfINZWiWlY", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_OTA.tar.gz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAB-exCH12CR5vKkxvIpJwxAdtFrNbKct7Wf5EB3V8Sg8E"};
+const LINKS = {"recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.xz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDEA-rR360uSZnQ_1WpaQ64AW_62vLCzewqLvDoUEMe-JA", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.xz.sha256": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQCHYcaptVvEQ6x_1sbDeNzxAXFMo6e82S6TyX5PU6HKcPc", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.sha": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQBLuGx4SFspQZVHwRXGDpMbAT6FZWp66b1zfYw4agSmBGU", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.txt": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQA1U3uVgsPFRrnZnCN6L3xiAcXA_86xtlPzq_G8-WFWs98", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal_OTA.checksums": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAE53plL9wJSa8c1KTxoJWkAaR8LQN4p_9AOopp7rAppOk", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal_OTA.tar.gz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAoWcD12usiR5LtWx1d65FhAYfVvJEhzBiiHSpJLHgyWm8", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAmjuEHukIrQ7wSddXQcVcEAZD100eDb1Ttd-fMYN8m_YM", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz.sha256": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAB7Y45eP37TbcxRFYi6LruAQ8r48LzEe6RtzW2O3TIvJg", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.sha": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQCTHiBSrFENQ5QkX2eYDpvuAUthFdNgvcTiW2clBpJbTos", "recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.txt": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQBEqlshwHKPQb0POK4YFgwLAQPUxm_bCxGOTrAIRYH3JNc", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_OTA.checksums": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAZItASQEWMQ5gQZNNK0IqmAfUR9qy9jk3qLM-8hFcsiyc", "recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_OTA.tar.gz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQCwAr0GnuhPSZ0v0qWofjqHAW4g2roenM-jd_L33WOHEZo"};
 
 const BOARD_PAT = /Recomputer-([A-Za-z0-9][A-Za-z0-9-]*?)_/;
 const VER_PAT = /^Armbian[^_]*_([^_]+)/;               // Armbian[-unofficial]_26.11.0-trunk_…
 const REL_PAT = /_([a-z]+)_vendor_([0-9][\w.-]*?)_/;   // …_resolute_vendor_6.1.172_…
 const VARIANT_TITLE = { cli: "CLI", desktop: "Desktop" };
 const ROW_LABEL = { img: "Image", ota: "OTA",
-                    sha256: "sha256", sha: "sha256", chk: "checksum", txt: "Build info" };
-// button groups, rendered with a separator between each pair
-const GROUPS = [["img", "sha256"], ["ota", "chk"], ["txt"]];
+                    sha256: "sha256", sha: "sha256", chk: "checksum" };
+// button groups, rendered with a separator between each pair;
+// Build info (txt) is not a button — it lives on the meta line
+const GROUPS = [["img", "sha256"], ["ota", "chk"]];
 
 function parse(name, size, url) {
   const m = name.match(BOARD_PAT);
@@ -248,16 +252,26 @@ function el(tag, cls, text) {
 // control and the yellow secure button style
 function buildRow(entry, opts, slot) {
   // head: bold variant + gray " - codename - armbian version - kernel" meta
+  // + "Build info" text link (build metadata, not a downloadable artifact)
   const head = el("div", "row-head");
   const title = el("span", "row-title", VARIANT_TITLE[entry.variant]);
   if (entry.mode === "ab" && !opts.suppressAb)
     title.appendChild(el("span", "badge ab", "A/B"));
   const meta = [entry.release, entry.ver, entry.kernel].filter(Boolean).join(" - ");
   if (meta) head.appendChild(el("span", "row-meta", "- " + meta));
+  if (entry.d && entry.d.txt) {
+    const v = entry.d.txt;
+    const a = el("a", "row-info", "Build info");
+    const linkKey = Object.keys(LINKS).find(k => k.endsWith("/" + v.name));
+    a.href = (linkKey && LINKS[linkKey]) || v.url || "#";
+    a.target = "_blank";
+    a.rel = "noopener";
+    head.appendChild(a);
+  }
   head.prepend(title);
 
-  // links: [Image sha256] | [OTA checksum] | [Build info] — groups split
-  // by a vertical rule; no sizes; primary buttons go yellow in Secure boxes
+  // links: [Image sha256] | [OTA checksum] — groups split by a vertical
+  // rule; no sizes; primary buttons go yellow in Secure boxes
   const links = el("div", "row-links");
   for (const group of GROUPS) {
     const present = group.filter(k => entry.d && entry.d[k]);

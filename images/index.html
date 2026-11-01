@@ -3,7 +3,7 @@
   Images download page — static template.
 
   Rendered by promote-images.yml's pages job with envsubst; the ONLY
-  substitutions are mingzhangqun/seeed_armbian_extension (release repo, for the API fetch) and
+  substitutions are mingzhangqun/armbian-build (release repo, for the API fetch) and
   https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE (OneDrive armbian/images folder share URL). The inline JS
   deliberately uses no backtick template literals: ${...} sequences
   would collide with envsubst. Keep it that way.
@@ -139,13 +139,13 @@
 
   <div id="fallback" class="fallback" hidden>
     <span>⚠ Could not fetch release info from GitHub (or there is no stable release yet). Direct downloads:</span>
-    <a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/latest">GitHub Releases</a>
+    <a class="btn primary" href="https://github.com/mingzhangqun/armbian-build/releases/latest">GitHub Releases</a>
     <a class="btn primary" href="https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE">☁ OneDrive</a>
   </div>
   <noscript>
     <div class="fallback">
       <span>This page needs JavaScript to fetch the latest releases from GitHub. Direct downloads:</span>
-      <a class="btn primary" href="https://github.com/mingzhangqun/seeed_armbian_extension/releases/latest">GitHub Releases</a>
+      <a class="btn primary" href="https://github.com/mingzhangqun/armbian-build/releases/latest">GitHub Releases</a>
       <a class="btn primary" href="https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE">☁ OneDrive</a>
     </div>
   </noscript>
@@ -157,7 +157,7 @@
 
 <script>
 "use strict";
-const CFG = Object.freeze({ repo: "mingzhangqun/seeed_armbian_extension", onedrive: "https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE" });
+const CFG = Object.freeze({ repo: "mingzhangqun/armbian-build", onedrive: "https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE" });
 
 // Every download button is a OneDrive link, derived client-side from the
 // folder share link: the share id is u!<base64url(share URL)> and a file

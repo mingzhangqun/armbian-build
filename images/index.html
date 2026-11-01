@@ -159,21 +159,11 @@
 "use strict";
 const CFG = Object.freeze({ repo: "mingzhangqun/armbian-build", onedrive: "https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE" });
 
-// ── Embedded file data ─────────────────────────────────────────────
-// Build-time: release job dumps per-board rclone lsjson to files-<board>.json
-// Page renders directly from this embedded data — no runtime fetch needed.
-const FILES = $PAGE_FILES;
-
-// ── OneDrive helpers ───────────────────────────────────────────────
-// Direct download link via OneDrive file ID (from rclone lsjson).
-// Format: https://<tenant>-my.sharepoint.com/personal/<user>/_layouts/15/download.aspx?UniqueId=<id>
-function odDownloadUrl(fileId) {
-  const [driveId, itemId] = fileId.split("#");
-  const base = CFG.onedrive.split("/:f:/")[0];
-  const user = CFG.onedrive.match(/personal\/([^/]+)/)?.[1];
-  if (!base || !user) return "#";
-  return base + "/personal/" + user + "/_layouts/15/download.aspx?UniqueId=" + itemId;
-}
+// ── Embedded link data ─────────────────────────────────────────────
+// Build-time: build job generates links__<board>__<entry>.json with
+// rclone link for each uploaded file. Page renders directly from this
+// embedded data — no runtime OneDrive API calls needed.
+const LINKS = {};
 
 const BOARD_PAT = /Recomputer-([A-Za-z0-9][A-Za-z0-9-]*?)_/;
 const VER_PAT = /^Armbian[^_]*_([^_]+)/;               // Armbian[-unofficial]_26.11.0-trunk_…

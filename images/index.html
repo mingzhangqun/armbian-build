@@ -365,12 +365,6 @@ async function slotAssets(rel) {
   return [].concat(...lists);
 }
 
-// ── Embedded link data ─────────────────────────────────────────────
-// Build-time: build job generates links__<board>__<entry>.json with
-// rclone link for each uploaded file. Page renders directly from this
-// embedded data — no runtime OneDrive API calls needed.
-const LINKS = {};
-
 async function splitBoards(rel) {
   const sections = new Map();
   for (const e of group(await slotAssets(rel))) {

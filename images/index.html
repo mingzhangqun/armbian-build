@@ -261,8 +261,8 @@ function el(tag, cls, text) {
   return e;
 }
 
-// opts: {suppressAb, suppressCrypt, secure} — badge/box-title redundancy
-// control and the yellow secure button style
+// opts: {suppressAb, suppressCrypt, secure, fileIds} — badge/box-title redundancy
+// control, yellow secure button style, and OneDrive file IDs for direct download
 function buildRow(entry, opts, slot) {
   // head: bold variant + gray " - codename - armbian version - kernel" meta
   const head = el("div", "row-head");
@@ -285,7 +285,9 @@ function buildRow(entry, opts, slot) {
       const primary = kind === "img" || kind === "ota";
       const cls = primary ? (opts.secure ? "btn secure" : "btn primary") : "btn";
       const a = el("a", cls, ROW_LABEL[kind]);
-      a.href = odUrl(odBoard(entry), slot, v.name);
+      // Use direct download link if we have the OneDrive file ID
+      const fileId = opts.fileIds?.[v.name];
+      a.href = fileId ? odDownloadUrl(fileId) : odUrl(odBoard(entry), slot, v.name);
       grp.appendChild(a);
     }
     links.appendChild(grp);
@@ -307,7 +309,7 @@ function buildModeBox(title, subtitle, entries, opts, slot) {
   return box;
 }
 
-function buildSection(board, entries, slot) {
+function buildSection(board, entries, slot, fileIds) {
   const sec = el("section", "board");
 
   // photo column: board name ABOVE the photo, large
@@ -330,16 +332,16 @@ function buildSection(board, entries, slot) {
   const abS  = entries.filter(e => e.mode === "ab" && e.crypt);
   const boxes = el("div", "modeboxes");
   boxes.appendChild(buildModeBox("Recovery", "Single partition", rec,
-                                 { suppressAb: false }, slot));
+                                 { suppressAb: false, fileIds }, slot));
   if (ab.length)
     boxes.appendChild(buildModeBox("A/B", "Dual partition", ab,
-                                   { suppressAb: true }, slot));
+                                   { suppressAb: true, fileIds }, slot));
   if (recS.length)
     boxes.appendChild(buildModeBox("Recovery", "Single partition", recS,
-                                   { secure: true }, slot));
+                                   { secure: true, fileIds }, slot));
   if (abS.length)
     boxes.appendChild(buildModeBox("A/B", "Dual partition", abS,
-                                   { suppressAb: true, secure: true }, slot));
+                                   { suppressAb: true, secure: true, fileIds }, slot));
 
   const info = el("div", "info");
   info.append(boxes);
@@ -383,7 +385,8 @@ async function slotAssets(rel) {
 
 // OneDrive share links don't support API traversal without extra permissions.
 // Build time: rclone lsjson dumps per-board trees to files-<board>.json on the release.
-// Runtime: page fetches per-board files.json once, no per-file OneDrive API calls needed.
+// Runtime: page fetches per-board files.json once, uses the embedded OneDrive ID
+// for direct download links — no per-file OneDrive API calls needed.
 async function odFiles(tag, board) {
   const rel = await fetch("https://api.github.com/repos/" + CFG.repo + "/releases/tags/" + tag);
   if (!rel.ok) return null;
@@ -393,6 +396,18 @@ async function odFiles(tag, board) {
   const r = await fetch(filesAsset.browser_download_url);
   if (!r.ok) return null;
   return r.json();
+}
+
+// Direct download link via OneDrive file ID (from rclone lsjson).
+// Format: https://<tenant>-my.sharepoint.com/personal/<user>/_layouts/15/download.aspx?UniqueId=<id>
+function odDownloadUrl(fileId) {
+  // Extract the drive ID portion (before #) and item ID (after #)
+  const [driveId, itemId] = fileId.split("#");
+  // Reconstruct the tenant base from the share link
+  const base = CFG.onedrive.split("/:f:/")[0];
+  const user = CFG.onedrive.match(/personal\/([^/]+)/)?.[1];
+  if (!base || !user) return "#";
+  return base + "/personal/" + user + "/_layouts/15/download.aspx?UniqueId=" + itemId;
 }
 
 function odUrl(board, slot, name) {
@@ -445,8 +460,20 @@ async function buildSlot(rel, kind) {  // kind: "latest" | "pre" | "prev"
       "Build completed on all boards — pending on-device verification before promotion to stable."));
   const slotDir = kind === "latest" ? (rel.prerelease ? "pre-release" : "latest")
                 : kind === "pre" ? "pre-release" : "previous";
-  for (const [b, es] of await splitBoards(rel))
-    body.appendChild(buildSection(b, es, slotDir));
+
+  // Fetch per-board file IDs for direct download links
+  const boards = await splitBoards(rel);
+  for (const [b, es] of boards) {
+    const files = await odFiles(rel.tag_name, odBoard({ board: b }));
+    const fileIds = {};
+    if (files) {
+      for (const f of files) {
+        // Map relative path → OneDrive file ID for direct download
+        fileIds[f.Path] = f.ID;
+      }
+    }
+    body.appendChild(buildSection(b, es, slotDir, fileIds));
+  }
 
   det.append(sum, body);
   return det;

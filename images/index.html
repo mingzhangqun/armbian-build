@@ -3,10 +3,9 @@
   Images download page — static template.
 
   Rendered by promote-images.yml's pages job with envsubst; the ONLY
-  substitutions are mingzhangqun/armbian-build (release repo, for the API fetch) and
-  https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE (OneDrive armbian/images folder share URL). The inline JS
-  deliberately uses no backtick template literals: ${...} sequences
-  would collide with envsubst. Keep it that way.
+  substitution is mingzhangqun/armbian-build (release repo, for the API fetch). The
+  inline JS deliberately uses no backtick template literals: ${...}
+  sequences would collide with envsubst. Keep it that way.
 
   Data flow (all client-side at browse time):
     * /releases list → three slots: newest full release = Stable,
@@ -97,10 +96,6 @@
   .btn.secure { background: #ffbc44; border-color: #ffbc44; color: #03353f; font-weight: 600; }
   .btn:hover { filter: brightness(.96); }
   .loading { color: #7b8fa0; padding: 30px 0; }
-  .fallback { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-              background: #fff; border: 1px solid #ffd9a0; border-radius: 14px;
-              padding: 18px 24px; margin: 22px 0; font-size: 14px; }
-  .fallback[hidden] { display: none; }
 
   /* ── slot (<details>) blocks: previous / pre-release ── */
   details.slot { background: #fff; border-radius: 14px; margin: 22px 0;
@@ -138,55 +133,27 @@
 <main>
   <div id="boards" class="loading">Fetching releases from GitHub…</div>
   <div id="slots"></div>
-
-  <div id="fallback" class="fallback" hidden>
-    <span>⚠ Could not fetch release info from GitHub (or there is no stable release yet). Direct downloads:</span>
-    <a class="btn primary" href="https://github.com/mingzhangqun/armbian-build/releases/latest">GitHub Releases</a>
-    <a class="btn primary" href="https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE">☁ OneDrive</a>
-  </div>
-  <noscript>
-    <div class="fallback">
-      <span>This page needs JavaScript to fetch the latest releases from GitHub. Direct downloads:</span>
-      <a class="btn primary" href="https://github.com/mingzhangqun/armbian-build/releases/latest">GitHub Releases</a>
-      <a class="btn primary" href="https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE">☁ OneDrive</a>
-    </div>
-  </noscript>
 </main>
 
 <script>
 "use strict";
-const CFG = Object.freeze({ repo: "mingzhangqun/armbian-build", onedrive: "https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE" });
+const CFG = Object.freeze({ repo: "mingzhangqun/armbian-build" });
 
 // ── Embedded data ──────────────────────────────────────────────────
 // Build-time: pages job walks OneDrive for share links and fetches the
 // release list from GitHub API, then embeds both here. Page renders
 // entirely from embedded data — no runtime API calls needed.
-const LINKS = {};
+const LINKS = {"pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.sha": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDILLiCQY0tSp6-tPBEAgvcAdOLnAtTsZM8a4UfcIZuoxw", "pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.txt": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQA7lBZKg9BZTrKTtU_XgjyuAYnGGKrbgM6K_DrHvmGF_HA", "pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQCGwp29LwnFTrSo8MkZF4RnAbkqxkLVnzKt9abdxdvKpjE", "pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz.sha256": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDr7OwD0dO9Try18WBncHnBAYla5AqpR7ZFWkrWKVidEx0", "pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.sha": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQD_YRjqLxzZSaeHcP37ThFxAfWGj2yAleFRaAf3GGBAglc", "pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.txt": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAX9nupzjBpS4hooK1uIg5XATaxDtGY-O9WJ9TxsIBPR1E", "pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.xz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQBKno3xcfP7S7NrdHFwUiGzAbyzmH3KAHAow38sNz_XqB4", "pre-release/recovery/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal.img.xz.sha256": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDGSuJaOvbpS7Z8jEozf1zbAWMMYsLOOOVVzXZjZcpeq8A", "pre-release/recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_OTA.checksums": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAWDWmw4cvkSqlNNEN1HTv0AU6VfG0NU_JCy5qHfflB5Ps", "pre-release/recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_OTA.tar.gz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAGV3qBNgzqTqB0aJltjYNTAcbdTQ3x1xzeU_tORswKPZo", "pre-release/recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal_OTA.checksums": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQAxdU1n2gerTq6Sb3feNCf2AQzuXV8Uw2fVWm_-prO2VXo", "pre-release/recovery/ota/Armbian_26.02.0_Recomputer-rk3576-devkit_trixie_vendor_6.1.0_minimal_OTA.tar.gz": "https://seeedstudio88-my.sharepoint.com/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/_layouts/15/download.aspx?share=IQDxct6n89ZfSpEoQxIOEbB4AX2uLi_8QK37w98hkHsJiJc"};
 const RELEASES = [
   {
-    "tag_name": "261101-1535",
+    "tag_name": "261101-1601",
     "prerelease": true,
-    "published_at": "2026-11-01T15:36:13Z"
+    "published_at": "2026-11-01T16:02:40Z"
   },
   {
-    "tag_name": "261101-1530",
+    "tag_name": "261101-1555",
     "prerelease": true,
-    "published_at": "2026-11-01T15:31:45Z"
-  },
-  {
-    "tag_name": "261101-1519",
-    "prerelease": true,
-    "published_at": "2026-11-01T15:20:42Z"
-  },
-  {
-    "tag_name": "261101-1505",
-    "prerelease": false,
-    "published_at": "2026-11-01T15:06:15Z"
-  },
-  {
-    "tag_name": "261101-1441",
-    "prerelease": false,
-    "published_at": "2026-11-01T14:42:38Z"
+    "published_at": "2026-11-01T15:56:37Z"
   }
 ];
 
@@ -499,7 +466,8 @@ async function boot() {
     }
     nav.hidden = nav.children.length === 0;
   } catch (e) {
-    boards.hidden = true; fallback.hidden = false;
+    boards.hidden = false;
+    boards.textContent = "⚠ No releases available. Please check back later.";
   }
 }
 

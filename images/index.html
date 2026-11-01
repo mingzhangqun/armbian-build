@@ -159,29 +159,20 @@
 "use strict";
 const CFG = Object.freeze({ repo: "mingzhangqun/armbian-build", onedrive: "https://seeedstudio88-my.sharepoint.com/:f:/g/personal/baozhu_zuo_seeedstudio88_onmicrosoft_com/IgCn5DwZz7AIS7TTjct1sSsHATBmvJuQFDFo3y5xKoXhgFE" });
 
-// Every download button is a OneDrive link, derived client-side from the
-// folder share link: the share id is u!<base64url(share URL)> and a file
-// is addressed as shares/<id>/root:/<path>/<file>:/content — no server
-// or per-file link manifest needed.
-function shareRoot(url) {
-  const b64 = btoa(unescape(encodeURIComponent(url)))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  return "https://api.onedrive.com/v1.0/shares/u!" + b64 + "/root:";
-}
-const OD_ROOT = shareRoot(CFG.onedrive);
-function odUrl(board, slot, name) {
-  // `name` already carries the sub path under the slot
-  // ("<profile>[-secure-boot]/<file>" or "<profile>[-secure-boot]/ota/<file>")
-  // — build-info manifests emit it that way since the upload layout moved
-  // to per-profile subdirs.
-  return OD_ROOT + "/armbian/images/" + board + "/" + slot + "/" + name + ":/content";
-}
-// The OneDrive dir is the armbian board id (recomputer-<board>, module
-// board spelled "-devkit"); manifest entries carry it verbatim. The
-// fallback reconstructs it from the parsed filename — used only for
-// manifest-less (GitHub-assets mode / fork) releases.
-function odBoard(entry) {
-  return entry.odboard || ("recomputer-" + entry.board.replace("-dev-kit", "-devkit"));
+// ── Embedded file data ─────────────────────────────────────────────
+// Build-time: release job dumps per-board rclone lsjson to files-<board>.json
+// Page renders directly from this embedded data — no runtime fetch needed.
+const FILES = {"recomputer-rk3576-devkit": [{"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.sha", "Size": 147, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GVWP7K5BX5ABGLLJ457KJO4RTA"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.txt", "Size": 66, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CWNGSTNFGXBBC3NUDGJLS6IPP7"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3FWWPFXA4E4PFBLEMZTSCQ7YHUI"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz.sha256", "Size": 150, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3D2JNOFBNFORFH2AMZSEHF52H7D"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.sha", "Size": 135, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3F55Q4TV5AFEVHYIIFM6QBABYKH"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.txt", "Size": 62, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GHL6ISBIE2P5AIWVPHZKUR5H5E"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3FUO25PXKZGHFHKSU522A3JSJLR"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz.sha256", "Size": 138, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3DTC6V5E5RGPNEYKDPSYTSYKIZS"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GWWE3XSFKXTJFZANDQCTA2ROAQ"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz.sha256", "Size": 158, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3HSBLPMHTVHSJE3KEP3A3KSFSTA"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3EVDEAFFY3BWZCLIZTEWIDTWEXQ"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz.sha256", "Size": 146, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CHW7GDXJ5JD5FIVLHTQ4EWCSJC"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.sha", "Size": 155, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3AO3ZHSEGR6LJE3G3GQQOTVWDUW"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.txt", "Size": 60, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3EIVELDYPMFOBH27FOEZRS4IH5C"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CA46JWKJZPLZF2HNGCGCYRB7E6"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz.sha256", "Size": 158, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3B5RDOY6HPWFFC3D6FRZBV2AKJB"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.sha", "Size": 143, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3D44RPXQ7CUDVFKNHW53N3YM2UW"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.txt", "Size": 56, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3H7X3PBGPFJUNB2JTSIZLCXFLGL"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3DOK7OPJLXLPREI2SSA4AFGGPUH"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz.sha256", "Size": 146, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3DDNCZV5MGDI5D2SXPBR2PG7OFT"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GFWOYYG2MQINBKAKM2GD4PST4R"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz.sha256", "Size": 166, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3FDLE3GFNN62ZCIT2RRBUYQWBDX"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3AOKQ2AYTFHENCY5APF4IPGCKLI"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz.sha256", "Size": 154, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CJO2SVMWZ2ERCLFJUE5XJG2JYM"}]};
+
+// ── OneDrive helpers ───────────────────────────────────────────────
+// Direct download link via OneDrive file ID (from rclone lsjson).
+// Format: https://<tenant>-my.sharepoint.com/personal/<user>/_layouts/15/download.aspx?UniqueId=<id>
+function odDownloadUrl(fileId) {
+  const [driveId, itemId] = fileId.split("#");
+  const base = CFG.onedrive.split("/:f:/")[0];
+  const user = CFG.onedrive.match(/personal\/([^/]+)/)?.[1];
+  if (!base || !user) return "#";
+  return base + "/personal/" + user + "/_layouts/15/download.aspx?UniqueId=" + itemId;
 }
 
 const BOARD_PAT = /Recomputer-([A-Za-z0-9][A-Za-z0-9-]*?)_/;
@@ -261,8 +252,8 @@ function el(tag, cls, text) {
   return e;
 }
 
-// opts: {suppressAb, suppressCrypt, secure, fileIds} — badge/box-title redundancy
-// control, yellow secure button style, and OneDrive file IDs for direct download
+// opts: {suppressAb, suppressCrypt, secure} — badge/box-title redundancy
+// control and the yellow secure button style
 function buildRow(entry, opts, slot) {
   // head: bold variant + gray " - codename - armbian version - kernel" meta
   const head = el("div", "row-head");
@@ -285,9 +276,9 @@ function buildRow(entry, opts, slot) {
       const primary = kind === "img" || kind === "ota";
       const cls = primary ? (opts.secure ? "btn secure" : "btn primary") : "btn";
       const a = el("a", cls, ROW_LABEL[kind]);
-      // Use direct download link if we have the OneDrive file ID
-      const fileId = opts.fileIds?.[v.name];
-      a.href = fileId ? odDownloadUrl(fileId) : odUrl(odBoard(entry), slot, v.name);
+      // Use direct download link from embedded file ID
+      const fileId = v.id;
+      a.href = fileId ? odDownloadUrl(fileId) : "#";
       grp.appendChild(a);
     }
     links.appendChild(grp);
@@ -309,7 +300,7 @@ function buildModeBox(title, subtitle, entries, opts, slot) {
   return box;
 }
 
-function buildSection(board, entries, slot, fileIds) {
+function buildSection(board, entries, slot) {
   const sec = el("section", "board");
 
   // photo column: board name ABOVE the photo, large
@@ -332,16 +323,16 @@ function buildSection(board, entries, slot, fileIds) {
   const abS  = entries.filter(e => e.mode === "ab" && e.crypt);
   const boxes = el("div", "modeboxes");
   boxes.appendChild(buildModeBox("Recovery", "Single partition", rec,
-                                 { suppressAb: false, fileIds }, slot));
+                                 { suppressAb: false }, slot));
   if (ab.length)
     boxes.appendChild(buildModeBox("A/B", "Dual partition", ab,
-                                   { suppressAb: true, fileIds }, slot));
+                                   { suppressAb: true }, slot));
   if (recS.length)
     boxes.appendChild(buildModeBox("Recovery", "Single partition", recS,
-                                   { secure: true, fileIds }, slot));
+                                   { secure: true }, slot));
   if (abS.length)
     boxes.appendChild(buildModeBox("A/B", "Dual partition", abS,
-                                   { suppressAb: true, secure: true, fileIds }, slot));
+                                   { suppressAb: true, secure: true }, slot));
 
   const info = el("div", "info");
   info.append(boxes);
@@ -371,6 +362,8 @@ function slotsFrom(list) {
 // attaches a small manifest__<board>__<entry>.json asset listing the
 // files it shipped. Fetch and merge those; releases without manifest
 // assets fall back to their raw asset list (GitHub-assets mode / fork).
+// Note: manifest fetches are CORS-limited on github.io; the primary data
+// source is the embedded FILES object below (from files-<board>.json).
 const MANIFEST_PAT = /^manifest__.*\.json$/;
 async function slotAssets(rel) {
   const frags = (rel.assets || []).filter(a => MANIFEST_PAT.test(a.name));
@@ -383,39 +376,21 @@ async function slotAssets(rel) {
   return [].concat(...lists);
 }
 
-// OneDrive share links don't support API traversal without extra permissions.
-// Build time: rclone lsjson dumps per-board trees to files-<board>.json on the release.
-// Runtime: page fetches per-board files.json once, uses the embedded OneDrive ID
-// for direct download links — no per-file OneDrive API calls needed.
-async function odFiles(tag, board) {
-  const rel = await fetch("https://api.github.com/repos/" + CFG.repo + "/releases/tags/" + tag);
-  if (!rel.ok) return null;
-  const data = await rel.json();
-  const filesAsset = (data.assets || []).find(a => a.name === "files-" + board + ".json");
-  if (!filesAsset) return null;
-  const r = await fetch(filesAsset.browser_download_url);
-  if (!r.ok) return null;
-  return r.json();
-}
+// ── Embedded file data ─────────────────────────────────────────────
+// Build-time: release job dumps per-board rclone lsjson to files-<board>.json
+// Page renders directly from this embedded data — no runtime fetch needed.
+// Format: { "<board>": { "pre-release": [ {Path, Name, Size, ID, ...}, ... ], ... }, ... }
+const FILES = {"recomputer-rk3576-devkit": [{"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.sha", "Size": 147, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GVWP7K5BX5ABGLLJ457KJO4RTA"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.txt", "Size": 66, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CWNGSTNFGXBBC3NUDGJLS6IPP7"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3FWWPFXA4E4PFBLEMZTSCQ7YHUI"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img.xz.sha256", "Size": 150, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3D2JNOFBNFORFH2AMZSEHF52H7D"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.sha", "Size": 135, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3F55Q4TV5AFEVHYIIFM6QBABYKH"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.txt", "Size": 62, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GHL6ISBIE2P5AIWVPHZKUR5H5E"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3FUO25PXKZGHFHKSU522A3JSJLR"}, {"Path": "recovery/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img.xz.sha256", "Size": 138, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3DTC6V5E5RGPNEYKDPSYTSYKIZS"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GWWE3XSFKXTJFZANDQCTA2ROAQ"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop.img_OTA.tar.gz.sha256", "Size": 158, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3HSBLPMHTVHSJE3KEP3A3KSFSTA"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3EVDEAFFY3BWZCLIZTEWIDTWEXQ"}, {"Path": "recovery/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli.img_OTA.tar.gz.sha256", "Size": 146, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CHW7GDXJ5JD5FIVLHTQ4EWCSJC"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.sha", "Size": 155, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3AO3ZHSEGR6LJE3G3GQQOTVWDUW"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.txt", "Size": 60, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3EIVELDYPMFOBH27FOEZRS4IH5C"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CA46JWKJZPLZF2HNGCGCYRB7E6"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img.xz.sha256", "Size": 158, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3B5RDOY6HPWFFC3D6FRZBV2AKJB"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.sha", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.sha", "Size": 143, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3D44RPXQ7CUDVFKNHW53N3YM2UW"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.txt", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.txt", "Size": 56, "MimeType": "text/plain", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3H7X3PBGPFJUNB2JTSIZLCXFLGL"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz", "Size": 292, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3DOK7OPJLXLPREI2SSA4AFGGPUH"}, {"Path": "ab/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img.xz.sha256", "Size": 146, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3DDNCZV5MGDI5D2SXPBR2PG7OFT"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3GFWOYYG2MQINBKAKM2GD4PST4R"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_resolute_vendor_6.1.0_gnome_desktop_AB_PART.img_OTA.tar.gz.sha256", "Size": 166, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:46Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3FDLE3GFNN62ZCIT2RRBUYQWBDX"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz", "Size": 102400, "MimeType": "application/x-gzip", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3AOKQ2AYTFHENCY5APF4IPGCKLI"}, {"Path": "ab/ota/Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz.sha256", "Name": "Armbian_26.02.0_recomputer-rk3576-devkit_trixie_vendor_6.1.0_cli_AB_PART.img_OTA.tar.gz.sha256", "Size": 154, "MimeType": "application/octet-stream", "ModTime": "2026-11-01T11:04:47Z", "IsDir": false, "ID": "b!f5H9mii1mEKkzK_xnWupB3yXi2DW4OlLrRgSV5uOI1jgVX0sbD3oTZ4rUq7fHCp0#01ICE2Y3CJO2SVMWZ2ERCLFJUE5XJG2JYM"}]};
 
+// ── OneDrive helpers ───────────────────────────────────────────────
 // Direct download link via OneDrive file ID (from rclone lsjson).
 // Format: https://<tenant>-my.sharepoint.com/personal/<user>/_layouts/15/download.aspx?UniqueId=<id>
 function odDownloadUrl(fileId) {
-  // Extract the drive ID portion (before #) and item ID (after #)
   const [driveId, itemId] = fileId.split("#");
-  // Reconstruct the tenant base from the share link
   const base = CFG.onedrive.split("/:f:/")[0];
   const user = CFG.onedrive.match(/personal\/([^/]+)/)?.[1];
   if (!base || !user) return "#";
   return base + "/personal/" + user + "/_layouts/15/download.aspx?UniqueId=" + itemId;
-}
-
-function odUrl(board, slot, name) {
-  // `name` already carries the sub path under the slot
-  // ("<profile>[-secure-boot]/<file>" or "<profile>[-secure-boot]/ota/<file>")
-  // — build-info manifests emit it that way since the upload layout moved
-  // to per-profile subdirs.
-  return OD_ROOT + "/armbian/images/" + board + "/" + slot + "/" + name + ":/content";
 }
 
 async function splitBoards(rel) {
@@ -460,20 +435,8 @@ async function buildSlot(rel, kind) {  // kind: "latest" | "pre" | "prev"
       "Build completed on all boards — pending on-device verification before promotion to stable."));
   const slotDir = kind === "latest" ? (rel.prerelease ? "pre-release" : "latest")
                 : kind === "pre" ? "pre-release" : "previous";
-
-  // Fetch per-board file IDs for direct download links
-  const boards = await splitBoards(rel);
-  for (const [b, es] of boards) {
-    const files = await odFiles(rel.tag_name, odBoard({ board: b }));
-    const fileIds = {};
-    if (files) {
-      for (const f of files) {
-        // Map relative path → OneDrive file ID for direct download
-        fileIds[f.Path] = f.ID;
-      }
-    }
-    body.appendChild(buildSection(b, es, slotDir, fileIds));
-  }
+  for (const [b, es] of await splitBoards(rel))
+    body.appendChild(buildSection(b, es, slotDir));
 
   det.append(sum, body);
   return det;

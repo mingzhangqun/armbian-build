@@ -347,27 +347,21 @@ function slotsFrom(list) {
   return { latest: latest, previous: previous, pre: pre };
 }
 
-// OneDrive-mode releases carry no binary assets: each build entry
-// attaches a small manifest__<board>__<entry>.json asset listing the
-// files it shipped. Fetch and merge those; releases without manifest
-// assets fall back to their raw asset list (GitHub-assets mode / fork).
-// Note: manifest fetches are CORS-limited on github.io; the primary data
-// source is the embedded FILES object below (from files-<board>.json).
+// OneDrive-mode: build job generates links__<board>__<entry>.json with
+// rclone share links for each file. The page embeds these as LINKS — no
+// runtime fetch needed (CORS blocks github.io → github.com asset fetches).
 const MANIFEST_PAT = /^manifest__.*\.json$/;
-async function slotAssets(rel) {
+function slotAssets(rel) {
+  // Use embedded LINKS instead of fetching manifest assets
   const frags = (rel.assets || []).filter(a => MANIFEST_PAT.test(a.name));
   if (!frags.length) return rel.assets || [];
-  const lists = await Promise.all(frags.map(f => fetch(f.browser_download_url)
-    .then(r => {
-      if (!r.ok) throw new Error("manifest " + f.name + ": HTTP " + r.status);
-      return r.json();
-    })));
-  return [].concat(...lists);
+  // Extract file entries from LINKS keys
+  return Object.keys(LINKS).map(name => ({ name }));
 }
 
 async function splitBoards(rel) {
   const sections = new Map();
-  for (const e of group(await slotAssets(rel))) {
+  for (const e of group(slotAssets(rel))) {
     if (!sections.has(e.board)) sections.set(e.board, []);
     sections.get(e.board).push(e);
   }

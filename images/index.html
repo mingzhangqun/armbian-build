@@ -381,6 +381,28 @@ async function slotAssets(rel) {
   return [].concat(...lists);
 }
 
+// OneDrive share links don't support API traversal without extra permissions.
+// Build time: rclone lsjson dumps per-board trees to files-<board>.json on the release.
+// Runtime: page fetches per-board files.json once, no per-file OneDrive API calls needed.
+async function odFiles(tag, board) {
+  const rel = await fetch("https://api.github.com/repos/" + CFG.repo + "/releases/tags/" + tag);
+  if (!rel.ok) return null;
+  const data = await rel.json();
+  const filesAsset = (data.assets || []).find(a => a.name === "files-" + board + ".json");
+  if (!filesAsset) return null;
+  const r = await fetch(filesAsset.browser_download_url);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+function odUrl(board, slot, name) {
+  // `name` already carries the sub path under the slot
+  // ("<profile>[-secure-boot]/<file>" or "<profile>[-secure-boot]/ota/<file>")
+  // — build-info manifests emit it that way since the upload layout moved
+  // to per-profile subdirs.
+  return OD_ROOT + "/armbian/images/" + board + "/" + slot + "/" + name + ":/content";
+}
+
 async function splitBoards(rel) {
   const sections = new Map();
   for (const e of group(await slotAssets(rel))) {

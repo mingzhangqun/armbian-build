@@ -4,7 +4,13 @@
 
   Rendered by the images-page jobs (build/test/promote/refresh) by the
   deploy-pages action's renderer; the substitutions are mingzhangqun/armbian-build,
-  {}, [] and {}, fed from files (the
+  {}, [
+  {
+    "tag_name": "261103-0951",
+    "prerelease": true,
+    "published_at": "0001-01-01T00:00:00Z"
+  }
+] and {}, fed from files (the
   share-link map outgrew the kernel's env-var size limit). The inline JS
   deliberately uses no backtick template literals — plain $NAME
   substitution only, so keep avoiding ${...} sequences. Keep it that way.
@@ -148,7 +154,13 @@ const CFG = Object.freeze({ repo: "mingzhangqun/armbian-build" });
 // then embeds all three here. Page renders entirely from embedded data
 // — no runtime API calls needed.
 const LINKS = {};
-const RELEASES = [];
+const RELEASES = [
+  {
+    "tag_name": "261103-0951",
+    "prerelease": true,
+    "published_at": "0001-01-01T00:00:00Z"
+  }
+];
 const SLOTS = {};
 
 const BOARD_PAT = /Recomputer-([A-Za-z0-9][A-Za-z0-9-]*?)_/;

@@ -83,7 +83,9 @@
   /* OTA-mode boxes: Recovery (single partition) with the A/B box (dual
      partition) below it, then their Secure counterparts. */
   .modeboxes { display: flex; flex-direction: column; gap: 14px; }
-  .modebox { border: 1px solid #e3eaf0; border-radius: 10px; padding: 0 14px 6px; }
+  /* border visible-but-subordinate (#c5d2da): the mode grouping must be
+     legible, yet still yield to the colored secgroup frames above it */
+  .modebox { border: 1px solid #c5d2da; border-radius: 10px; padding: 0 14px 6px; }
   .modebox h3 { font-size: 13px; font-weight: 700; color: #03353f; margin: 10px 0 0; letter-spacing: .3px; }
   .modebox h3 svg.chip { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px;
                          color: #0ea5b7; }

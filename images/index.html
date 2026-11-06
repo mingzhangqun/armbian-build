@@ -713,12 +713,16 @@ async function boot() {
                           if (d) d.open = true; };
       nav.appendChild(a);
     }
-    // History pills: one per rendered history card, labeled YYMMDD,
-    // gray like the old Previous pill.
+    // History pills: one per rendered history card, gray like the old
+    // Previous pill. Labeled "History"; when several cards exist the
+    // short tag rides along so pills stay distinguishable. The date is
+    // always in the tooltip.
     for (const h of s.history || []) {
       const kind = "hist-" + h.tag_name;
       if (!document.getElementById("slot-" + kind)) continue;
-      const a = el("a", "prev", String(h.tag_name).slice(0, 6));
+      const label = (s.history || []).length > 1
+        ? "History " + String(h.tag_name).slice(0, 6) : "History";
+      const a = el("a", "prev", label);
       a.title = fmtDate(h.published_at) || h.tag_name;
       a.href = "#slot-" + kind;
       a.onclick = () => { const d = document.getElementById("slot-" + kind);

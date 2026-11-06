@@ -86,7 +86,14 @@
   /* border visible-but-subordinate (#c5d2da): the mode grouping must be
      legible, yet still yield to the colored secgroup frames above it */
   .modebox { border: 1px solid #c5d2da; border-radius: 10px; padding: 0 14px 6px; }
-  .modebox h3 { font-size: 13px; font-weight: 700; color: #03353f; margin: 10px 0 0; letter-spacing: .3px; }
+  /* title band: slightly darker than the box interior, bleeding to the
+     box edges (negative margins vs the box padding) and following its
+     top corners; bottom rule separates band from rows */
+  .modebox h3 { font-size: 13px; font-weight: 700; color: #03353f;
+                margin: 0 -14px 8px; padding: 8px 14px 7px;
+                background: rgba(3,53,63,.05);
+                border-bottom: 1px solid #c5d2da;
+                border-radius: 9px 9px 0 0; letter-spacing: .3px; }
   .modebox h3 svg.chip { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px;
                          color: #0ea5b7; }
   .boxsub { color: #9db0ba; font-weight: 400; font-size: 12px; }

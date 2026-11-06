@@ -33,7 +33,7 @@
   Layout: collapsible slot bars (Stable expanded by default, one gray
   History card per older stable), pill anchor nav under the title,
   per-board cards (name above photo, an Armbian board-page button
-  below), downloads split into two security groups (blue PLAIN / red
+  below), downloads split into two security groups (green PLAIN / red
   SECURE frames, corner labels) — each holding a Loader box first
   (maskrom / SPI flash, teal/orange buttons) then the Recovery / A/B
   image boxes; buttons grouped
@@ -109,8 +109,8 @@
   .btn { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px;
          text-decoration: none; color: #03353f; border: 1px solid #d7dee5; background: #fff;
          min-width: 84px; text-align: center; }
-  .btn.primary { background: #1e7fc0; border-color: #1e7fc0; color: #fff; font-weight: 600; }
-  /* secure-profile artifacts: yellow instead of blue */
+  .btn.primary { background: #8dc215; border-color: #8dc215; color: #fff; font-weight: 600; }
+  /* secure-profile artifacts: yellow instead of green */
   .btn.secure { background: #ffbc44; border-color: #ffbc44; color: #03353f; font-weight: 600; }
   /* production-loader buttons: teal (plain) / orange (secure) — a third
      color tier so factory artifacts never read as OS images */
@@ -146,19 +146,17 @@
   .slot-body .board { margin: 16px 0 8px; }
   .slot-note { color: #7b8fa0; font-size: 13px; padding: 12px 2px 0; }
 
-  /* ── security groups: blue PLAIN / red SECURE frames, solid inverted
-     corner labels — these replace the old per-box Secure badge. Blue
-     keeps green exclusive to the "Stable/recommended slot" meaning and
-     is red-green-colorblind-safe against the SECURE red ── */
-  .secgroup { border: 1px solid rgba(30,127,192,.45); border-radius: 12px;
+  /* ── security groups: green PLAIN / red SECURE frames, solid inverted
+     corner labels — these replace the old per-box Secure badge ── */
+  .secgroup { border: 1px solid rgba(141,194,21,.45); border-radius: 12px;
               padding: 14px 12px 14px; position: relative;
-              background: rgba(30,127,192,.03); }
+              background: rgba(141,194,21,.03); }
   .secgroup + .secgroup { margin-top: 18px; }
   .secgroup .modeboxes { gap: 10px; }
   .secgroup .glabel { position: absolute; top: -9px; left: 12px; font-size: 11px;
                       font-weight: 600; letter-spacing: 1px; padding: 0 8px;
-                      border-radius: 4px; background: #1e7fc0; color: #fff;
-                      border: 1px solid #1e7fc0; }
+                      border-radius: 4px; background: #8dc215; color: #fff;
+                      border: 1px solid #8dc215; }
   .secgroup.secure { border-color: rgba(217,58,58,.35);
                      background: rgba(217,58,58,.025); }
   .secgroup.secure .glabel { background: #c0392b; border-color: #c0392b; }
@@ -481,7 +479,7 @@ function buildSection(board, entries, slot, loaders) {
   pl.appendChild(pa);
   photo.appendChild(pl);
 
-  // downloads: two security groups (blue PLAIN / red SECURE frames),
+  // downloads: two security groups (green PLAIN / red SECURE frames),
   // each holding mode boxes — Loader first, then Recovery / A/B.
   // secure = the mirror's -secure-boot profile dir (see slotAssets) — NOT
   // the -crypt filename marker, which is encryption and self-describes.

@@ -116,10 +116,14 @@
   .row-info { color: #2c6fbf; font-size: 12.5px; text-decoration: underline;
               text-decoration-style: dotted; margin-left: 8px; }
   .row-info:hover { color: #1a4d8f; }
-  .row-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row-links { display: flex; flex-wrap: nowrap; gap: 8px; align-items: center;
+               overflow-x: auto; padding-bottom: 2px; }
+  /* Secure size text stays black, not the primary button's white. */
   .file-size { font-size: 12px; font-weight: 400; white-space: nowrap; opacity: .9; }
-  /* Download label and size form one pill; checksum stays a separate button. */
-  .grp { display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 8px; }
+  .btn.primary .file-size { color: #fff; }
+  .btn.secure .file-size, .btn.secure-loader .file-size { color: #03353f; }
+  /* Keep each download row on one line; narrow screens scroll the row. */
+  .grp { display: inline-flex; align-items: center; flex: 0 0 auto; flex-wrap: nowrap; gap: 8px; }
   .grp + .grp { margin-left: 16px; padding-left: 18px; border-left: 1px solid #d7dee5; }
   .badge { font-size: 11px; border-radius: 4px; padding: 0 6px; margin-left: 6px;
            vertical-align: 2px; }

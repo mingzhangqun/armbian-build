@@ -125,6 +125,10 @@
   /* Keep each download row on one line; narrow screens scroll the row. */
   .grp { display: inline-flex; align-items: center; flex: 0 0 auto; flex-wrap: nowrap; gap: 8px; }
   .grp + .grp { margin-left: 16px; padding-left: 18px; border-left: 1px solid #d7dee5; }
+  /* Loader types are independent rows, not an Image/OTA separator pair. */
+  .loader-links { flex-direction: column; align-items: flex-start; gap: 7px;
+                  overflow-x: visible; }
+  .loader-links .grp + .grp { margin-left: 0; padding-left: 0; border-left: none; }
   .badge { font-size: 11px; border-radius: 4px; padding: 0 6px; margin-left: 6px;
            vertical-align: 2px; }
   .btn { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 13px;
@@ -470,7 +474,7 @@ function buildLoaderBox(secure, lds, slot) {
     secure ? " - signed maskrom / SPI flash" : " - maskrom / SPI flash"));
   box.appendChild(h3);
   const row = el("div", "row");
-  const links = el("div", "row-links");
+  const links = el("div", "row-links loader-links");
   const cls = secure ? "btn secure-loader" : "btn loader";
   loaderGroup(links, "Maskrom", bySec.maskrom, cls);
   if (bySec.spi) loaderGroup(links, "SPI Flash", bySec.spi, cls);

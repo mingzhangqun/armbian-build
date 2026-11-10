@@ -17,7 +17,7 @@
     { repo,                         CFG.repo — GitHub release links
       slots:  { "stable": tag?, "pre-release": tag?,
                 "history": [tag, ...] },          (0..N older stables)
-      manifests: { tag: { files: {relpath: url} } },
+      manifests: { tag: { files: {relpath: url}, sizes: {relpath: bytes} } },
       releases: [{tag_name, prerelease, published_at}, ...] }
     where a relpath is "<board>/<sec>/<kind>/[ota/]<file>" — sec is
     plain|secure, kind is recovery|ab|loaders. ONE namespace: the
@@ -208,6 +208,7 @@ let CFG = Object.freeze({ repo: "" });
 let LINKS = {};
 let RELEASES = [];
 let SLOTS = {};
+let SIZES = {};
 
 async function loadData() {
   // {cache: no-cache} — revalidate past the CDN's ~10-min edge window
@@ -218,17 +219,16 @@ async function loadData() {
   CFG = Object.freeze({ repo: String(d.repo || "") });
   SLOTS = (d.slots && typeof d.slots === "object") ? d.slots : {};
   RELEASES = Array.isArray(d.releases) ? d.releases : [];
-  LINKS = synthLinks(SLOTS, (d.manifests && typeof d.manifests === "object") ? d.manifests : {});
+  const manifests = (d.manifests && typeof d.manifests === "object") ? d.manifests : {};
+  LINKS = synthLinks(SLOTS, manifests, "files");
+  SIZES = synthLinks(SLOTS, manifests, "sizes");
 }
 
-// slots + manifests → the flat path→URL map the page consumes:
-// "<slot>/<board>/<sec>/<kind>/..." (ONE namespace — loaders ride the
-// same map, distinguished by the kind segment). History tags prefix
-// "history/<tag>/". Single implementation (was deploy-pages python).
-function synthLinks(slots, manifests) {
+// slots + manifests → flat path→value maps for download links and sizes.
+function synthLinks(slots, manifests, field) {
   const links = {};
   const emit = (prefix, m) => {
-    const files = m.files || {};
+    const files = m[field] || {};
     for (const k in files) links[prefix + "/" + k] = files[k];
   };
   for (const slot of ["pre-release", "stable"])
@@ -342,6 +342,17 @@ function el(tag, cls, text) {
   return e;
 }
 
+function fmtSize(bytes) {
+  if (!Number.isSafeInteger(bytes) || bytes < 0) return "";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let value = bytes, unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return value.toFixed(unit === 0 || value >= 10 ? 0 : 1) + " " + units[unit];
+}
+
 // opts: {suppressAb, suppressCrypt, secure} — badge/box-title redundancy
 // control and the yellow secure button style
 function buildRow(entry, opts, slot) {
@@ -364,8 +375,8 @@ function buildRow(entry, opts, slot) {
   }
   head.prepend(title);
 
-  // links: [Image sha256] | [OTA checksum] — groups split by a vertical
-  // rule; no sizes; primary buttons go yellow in Secure boxes
+  // links: [Image size sha256] | [OTA size checksum] — groups split by
+  // a vertical rule; primary buttons go yellow in Secure boxes
   const links = el("div", "row-links");
   for (const group of GROUPS) {
     const present = group.filter(k => entry.d && entry.d[k]);
@@ -380,6 +391,8 @@ function buildRow(entry, opts, slot) {
       // the exact LINKS key carried on the asset — filenames repeat across
       // profile dirs, so a lookup by name can grab the twin's link.
       a.href = (v.lk && LINKS[v.lk]) || v.url || "#";
+      const size = primary ? fmtSize(v.size) : "";
+      if (size) a.appendChild(document.createTextNode(" " + size));
       grp.appendChild(a);
     }
     links.appendChild(grp);
@@ -585,7 +598,8 @@ function slotAssets(slotDir) {
   // (plain|secure) is the ONLY secure marker (filenames are identical
   // across profiles) — carry it into `secure`. Loader rows are not
   // image assets; slotLoaders() walks them from the same map.
-  // Size is 0 (the manifest carries no sizes).
+  // New manifests carry sizes; legacy ones gain them during Pages
+  // deployment without modifying their immutable manifest.
   return Object.keys(LINKS)
     .filter(path => {
       if (!path.startsWith(slotDir + "/")) return false;
@@ -594,7 +608,7 @@ function slotAssets(slotDir) {
     })
     .map(path => ({
       name: path.split("/").pop(),
-      size: 0,
+      size: SIZES[path],
       browser_download_url: LINKS[path],
       secure: path.slice(slotDir.length + 1).split("/")[1] === "secure",
       lk: path,

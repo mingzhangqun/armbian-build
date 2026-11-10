@@ -117,10 +117,12 @@
               text-decoration-style: dotted; margin-left: 8px; }
   .row-info:hover { color: #1a4d8f; }
   .row-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .file-size { color: #7b8fa0; font-size: 12px; white-space: nowrap; }
   /* button groups separated by a vertical rule:
      [Image sha256] | [OTA checksum] */
-  /* groups never split mid-pair; a too-narrow row wraps the WHOLE group,
-     keeping row starts aligned */
+  /* Size is muted metadata outside the fixed-size button. The Image/OTA
+     group has 3 items, so it wraps intact instead of leaving the size
+     behind on the previous line. */
   .grp { display: inline-flex; flex-wrap: nowrap; gap: 8px; }
   .grp + .grp { margin-left: 16px; padding-left: 18px; border-left: 1px solid #d7dee5; }
   .badge { font-size: 11px; border-radius: 4px; padding: 0 6px; margin-left: 6px;
@@ -375,8 +377,8 @@ function buildRow(entry, opts, slot) {
   }
   head.prepend(title);
 
-  // links: [Image size sha256] | [OTA size checksum] — groups split by
-  // a vertical rule; primary buttons go yellow in Secure boxes
+  // links: [Image · size sha256] | [OTA · size checksum] — size stays
+  // outside the button and never widens the download controls.
   const links = el("div", "row-links");
   for (const group of GROUPS) {
     const present = group.filter(k => entry.d && entry.d[k]);
@@ -391,8 +393,9 @@ function buildRow(entry, opts, slot) {
       // the exact LINKS key carried on the asset — filenames repeat across
       // profile dirs, so a lookup by name can grab the twin's link.
       a.href = (v.lk && LINKS[v.lk]) || v.url || "#";
+      grp.appendChild(a);
       const size = primary ? fmtSize(v.size) : "";
-      if (size) a.appendChild(document.createTextNode(" " + size));
+      if (size) grp.appendChild(el("span", "file-size", "· " + size));
       grp.appendChild(a);
     }
     links.appendChild(grp);
@@ -448,6 +451,8 @@ function loaderGroup(parent, label, lk, cls) {
   a.href = LINKS[lk] || "#";
   a.title = lk.split("/").pop();
   grp.appendChild(a);
+  const size = fmtSize(SIZES[lk]);
+  if (size) grp.appendChild(el("span", "file-size", "· " + size));
   const sha = el("a", "btn", "sha256");
   sha.href = LINKS[lk + ".sha256"] || "#";
   grp.appendChild(sha);

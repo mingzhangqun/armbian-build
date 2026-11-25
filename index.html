@@ -846,11 +846,13 @@ async function boot() {
     for (const [kind, label, rel, cls] of navItems)
       if (rel) addPill(kind, label, cls, null);
     // History pill: single tag → straight to its card; list → the bar.
+    // Count = rendered rows (a stale tag whose assets don't parse is
+    // skipped by buildSlot and must not inflate the label).
     if (s.history.length === 1)
       addPill("hist-" + s.history[0].tag_name, "History", "prev",
               fmtDate(s.history[0].published_at) || s.history[0].tag_name);
     else if (s.history.length > 1)
-      addPill("hist", "History (" + s.history.length + ")", "prev",
+      addPill("hist", "History (" + histCards.length + ")", "prev",
               s.history.map(h => h.tag_name).join(", "));
     nav.hidden = nav.children.length === 0;
     syncPills();   // initial: latest starts expanded

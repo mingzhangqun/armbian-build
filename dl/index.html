@@ -32,6 +32,9 @@ h2 .spacer{margin-left:auto}
 /* ---- 数据源 ---- */
 .cfg-row{display:flex;align-items:center;gap:6px;margin-top:9px}
 body.static #row-save-to,body.static #row-parallel{display:none}
+#row-aria2,#row-aria2-in{display:none}
+body.has-aria2 #row-aria2,body.has-aria2 #row-aria2-in{display:flex}
+body:not(.has-aria2) #btn-aria2-push{display:none}
 .cfg-k{width:58px;flex:none;font-size:13px;font-weight:600}
 .cfg-v{display:flex;align-items:center;gap:6px;min-width:0;flex:1;flex-wrap:wrap}
 .cfg-time{font-size:12px;color:var(--muted)}
@@ -197,7 +200,8 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 </head>
 <body>
 <script>/* 首帧同步预判模式: 非 localhost 先按静态(隐藏 Save to/Parallel), 避免刷新闪烁; 异步检测后再纠正 */
-if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body.className = 'static';
+if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body.classList.add('has-aria2');
+else document.body.className = 'static';
 </script>
 
 <header id="topbar">
@@ -222,10 +226,10 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
         <button id="btn-dl-dir" class="btn lgreen">Select</button>
       </span>
     </div>
-    <div class="cfg-row cfg-sep"><span class="cfg-k">Aria2</span>
+    <div class="cfg-row cfg-sep" id="row-aria2"><span class="cfg-k">Aria2</span>
       <span class="cfg-v"><span class="stat err" id="aria2-stat">Not Connected</span></span>
     </div>
-    <div class="cfg-row cfg-ind">
+    <div class="cfg-row cfg-ind" id="row-aria2-in">
       <input id="aria2-url" type="url" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
       <input id="aria2-token" type="password" placeholder="RPC secret" autocomplete="off">
     </div>
@@ -1106,16 +1110,55 @@ $('#btn-copy-urls').addEventListener('click', () => copyText(selectedFiles().map
 $('#btn-curl').addEventListener('click', () => copyText(curlScript(selectedFiles()), 'curl script copied'));
 $('#btn-aria2-push').addEventListener('click', () => aria2Push(selectedFiles()));
 // RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
-$('#aria2-url').value = localStorage.getItem('aria2-url') || '';
-$('#aria2-token').value = localStorage.getItem('aria2-token') || '';
-fetch('/api/aria2').then(r => r.json()).then(det => {
-  state.aria2Det = det;
-  if (!$('#aria2-url').value) { // 手动输入优先, 为空才用配置文件
-    $('#aria2-url').value = det.endpoint || '';
-    $('#aria2-token').value = det.token || '';
+const envReady = (async () => { // 环境检测: 本地 serve.py(全功能) / 纯静态(GitHub Pages, 降级)
+  let local = false;
+  try {
+    const r = await fetch('api/config');
+    local = r.ok && (r.headers.get('content-type') || '').includes('json');
+  } catch (e) {}
+  state.localServer = local;
+  document.body.classList.toggle('static', !local);
+  const q = new URLSearchParams(location.search).get('url');
+  state.url = q || DEFAULT_URL; // 两种模式统一默认自家镜像基址
+  loadData();
+})();
+
+// aria2 可见性与初始配置: 本地读配置文件(优先于 localStorage, 读取失败留空),
+// 静态模式无法读文件 → 静默探测 RPC(任何 HTTP 响应=已安装; 连接被拒=未装)
+(async () => {
+  await envReady; // 等环境检测完成(state.localServer 就绪)
+  const fill = (u, t) => { if (u != null) $('#aria2-url').value = u; if (t != null) $('#aria2-token').value = t; };
+  if (state.localServer) {
+    let det = null;
+    try { det = await (await fetch('/api/aria2')).json(); } catch (e) {}
+    document.body.classList.toggle('has-aria2', !!(det && det.installed)); // 修正首帧乐观显示
+    if (det && det.installed) {
+      state.aria2Det = det;
+      if (det.endpoint) fill(det.endpoint, det.token);          // 配置文件优先
+      else fill(localStorage.getItem('aria2-url') || '', localStorage.getItem('aria2-token') || ''); // 无 RPC 配置 → 回退
+      aria2Check();
+    } // 未安装 aria2 → 保持隐藏
+  } else {
+    const saved = localStorage.getItem('aria2-url') || '';
+    fill(saved, localStorage.getItem('aria2-token') || '');
+    const probe = saved || 'http://127.0.0.1:6800/jsonrpc';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 2000);
+    let present = false;
+    try {
+      await fetch(probe, {method: 'POST', signal: ctrl.signal,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: 'aria2.getVersion', params: []})});
+      present = true; // 任何 HTTP 响应(含 401/400)都说明 aria2 在监听
+    } catch (e) { present = false; } // 连接被拒/超时 → 未安装
+    clearTimeout(timer);
+    if (present || saved) {
+      document.body.classList.add('has-aria2');
+      if (!saved) fill(probe, null); // 探测到默认端口 → 填地址(密钥留待用户输入)
+      aria2Check();
+    }
   }
-  aria2Check();
-}).catch(() => { aria2Check(); });
+})();
 // aria2 RPC 地址与密钥: 改动即存 localStorage(跨会话记忆), 手动输入优先于配置文件自动检测
 const aria2Persist = () => {
   localStorage.setItem('aria2-url', $('#aria2-url').value.trim());
@@ -1204,18 +1247,6 @@ concSel.addEventListener('change', () => {
 });
 state.dlConc = +concSel.value || 2;
 
-(async () => { // 环境检测: 本地 serve.py(全功能) / 纯静态(GitHub Pages, 降级)
-  let local = false;
-  try {
-    const r = await fetch('api/config');
-    local = r.ok && (r.headers.get('content-type') || '').includes('json');
-  } catch (e) {}
-  state.localServer = local;
-  document.body.classList.toggle('static', !local);
-  const q = new URLSearchParams(location.search).get('url');
-  state.url = q || DEFAULT_URL; // 两种模式统一默认自家镜像基址
-  loadData();
-})();
 </script>
 </body>
 </html>

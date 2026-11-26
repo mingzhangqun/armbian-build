@@ -823,7 +823,7 @@ function dlPanelShow(tag, total) {
 }
 function dlPanelHide() { $('#dlpanel').hidden = true; }
 
-async function downloadStructured(files) {
+async function downloadStructured(files, direct) {
   const tag = state.tag;
   const root = await pickRootDir();
   const ctrl = new AbortController();
@@ -895,8 +895,8 @@ async function downloadStructured(files) {
           continue;
         }
         const headers = (expected && have > 0) ? {Range: 'bytes=' + have + '-'} : undefined;
-        const resp = await fetch('/api/proxy?url=' + encodeURIComponent(f.url),
-                                 {signal: fctrl.signal, headers});
+        const src = direct ? f.url : '/api/proxy?url=' + encodeURIComponent(f.url);
+        const resp = await fetch(src, {signal: fctrl.signal, headers});
         if (!resp.body || (resp.status !== 200 && resp.status !== 206))
           throw new Error('HTTP ' + resp.status);
         const from = resp.status === 206 ? have : 0; // 200 = 远端不支持续传, 整文件重下
@@ -1014,22 +1014,25 @@ async function pollServerJob(base) { // 轮询 /api/job 直到结束; base 用�
 }
 
 async function downloadAll(files) {
-  if (state.localServer) { // 服务端与浏览器代理模式都依赖本地 serve.py
+  if (state.localServer) { // 首选: 服务端按 Save to 配置落盘(依赖 serve.py)
     try {
-      await downloadServer(files); // 首选: 服务端按 Save to 配置落盘
+      await downloadServer(files);
       return;
-    } catch (e) { /* 无 /api/download(旧服务端) → 回退浏览器目录选择 */ }
+    } catch (e) { /* 无 /api/download(旧服务端) → 回退浏览器模式 */ }
+  }
   if (window.showDirectoryPicker) {
+    // 浏览器目录树下载 <tag>/<board>/<variant>/<cat>/[ota/]<file>;
+    // 静态模式直连远端(实测 SharePoint 直链已带 ACAO:*), 本地模式经 /api/proxy
     try {
-      await downloadStructured(files); // 目录树 <tag>/<board>/<variant>/<cat>/[ota/]<file>
+      await downloadStructured(files, !state.localServer);
       return;
     } catch (e) {
       if (e && e.name === 'AbortError') return; // 用户取消目录选择
-      console.warn('structured download failed, falling back to browser downloads:', e);
+      console.warn('structured download failed, falling back:', e);
+      toast('Tree download failed: ' + e.message + '; using browser default downloads');
     }
-  }
   } else {
-    toast('Static mode: browser default downloads; use Push to aria2 for the directory tree');
+    toast('Directory picker unavailable, using browser default downloads');
   }
   downloadIframe(files);
 }

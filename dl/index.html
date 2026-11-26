@@ -683,6 +683,9 @@ async function aria2Push(files, pickDir) {
   const same = det.endpoint && endpoint.replace(/\/+$/, '') === det.endpoint.replace(/\/+$/, '');
   let base = (same && det.downloaddir) ? det.downloaddir.replace(/\/+$/, '') + '/' : '';
   if (pickDir) base = pickDir.replace(/\/+$/, '') + '/'; // 弹窗选择的绝对目录优先
+  else if (!state.localServer) { // 静态直连: 相对 dir 会按 aria2 守护进程 CWD 解析(不可靠),
+    base = (await aria2GlobalDir(endpoint, token)).replace(/\/+$/, '') + '/'; // 取全局下载根拼绝对路径
+  }
   const entries = aria2Entries(files, base);
   toast('Pushing ' + files.length + ' tasks to aria2…');
   try {
@@ -714,21 +717,22 @@ async function aria2Push(files, pickDir) {
           ok++;
         } catch (er) { errs.push(e.out + ': ' + er.message); }
       }
-      let root = '';
-      try { // 取 aria2 全局下载根, toast 显示实际落盘目录
-        const g = await fetch(endpoint, {method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: 'aria2.getGlobalOption',
-                                params: token ? ['token:' + token] : []})});
-        const gj = await g.json();
-        root = ((gj.result && gj.result.dir) || '').replace(/\/+$/, '');
-      } catch (e) {}
       if (errs.length) toast('Pushed ' + ok + ', failed: ' + errs[0]);
-      else toast('Pushed ' + ok + ' tasks → ' + (root ? root + '/' : '') + state.tag + '/ tree');
+      else toast('Pushed ' + ok + ' tasks → ' + base + state.tag + '/ tree');
     }
   } catch (e) {
     toast('Push failed: ' + e.message);
   }
+}
+async function aria2GlobalDir(endpoint, token) { // aria2 全局下载根(绝对路径)
+  try {
+    const resp = await fetch(endpoint, {method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: 'aria2.getGlobalOption',
+                              params: token ? ['token:' + token] : []})});
+    const j = await resp.json();
+    return (j.result && j.result.dir) || '';
+  } catch (e) { return ''; }
 }
 async function aria2Check() {
   // 连通性检测: 状态标签显示 Connected / Not Connected

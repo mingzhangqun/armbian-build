@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armbian Image Downloader</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --ink:#1c2333; --muted:#6b7280; --line:#e5e7eb;
+  --accent:#e0662a; --accent-soft:rgba(224,102,42,.10);
+  --chip:#eef1f6; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+     font:14px/1.5 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC",sans-serif}
+button{font:inherit}
+
+/* ---- 顶栏 ---- */
+#topbar{position:sticky;top:0;z-index:20;background:#171d2b;color:#fff;
+        display:flex;align-items:center;gap:16px;padding:10px 20px;flex-wrap:wrap}
+#topbar .brand{font-weight:700;font-size:16px;white-space:nowrap}
+
+main{max-width:1100px;margin:0 auto;padding:16px 20px 90px}
+section.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+             padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+h2{display:flex;align-items:center;gap:10px;font-size:15px;margin:0 0 14px}
+h2 .step{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+         font-style:normal;font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+h2 .sub{color:var(--muted);font-weight:400;font-size:12px}
+h2 .spacer{margin-left:auto}
+
+/* ---- 数据源 ---- */
+.cfg-row{display:flex;align-items:center;gap:6px;margin-top:9px}
+body.static #row-save-to,body.static #row-parallel{display:none}
+.cfg-k{width:58px;flex:none;font-size:13px;font-weight:600}
+.cfg-v{display:flex;align-items:center;gap:6px;min-width:0;flex:1;flex-wrap:wrap}
+.cfg-time{font-size:12px;color:var(--muted)}
+.cfg-sep{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.cfg-ind{padding-left:64px}
+.cfg-ind input{flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
+               border-radius:8px;padding:8px 10px;color:var(--ink)}
+.cfg-ind input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+#src-input{font-family:var(--mono)}
+#dl-dir{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
+        border-radius:8px;padding:8px 10px;color:var(--ink)}
+#btn-dl-dir{min-width:86px;padding:8px 14px;white-space:nowrap;flex:none}
+/* ---- 目录选择弹窗 ---- */
+#dlmodal{position:fixed;inset:0;z-index:40;background:rgba(23,29,43,.45);
+         display:flex;align-items:center;justify-content:center}
+#dlmodal[hidden]{display:none}
+.dlm-card{background:#fff;border-radius:12px;width:440px;max-width:calc(100vw - 32px);
+          box-shadow:0 12px 40px rgba(16,24,40,.25);overflow:hidden}
+.dlm-head{display:flex;align-items:center;gap:8px;padding:12px 14px;font-weight:600;font-size:14px;
+          border-bottom:1px solid var(--line)}
+.dlm-head .btn{margin-left:auto;padding:3px 10px}
+.dlm-path{padding:8px 14px;font-family:var(--mono);font-size:12px;color:var(--muted);
+          word-break:break-all;background:var(--chip)}
+.dlm-list{max-height:300px;overflow:auto;padding:6px}
+.dlm-item{padding:7px 10px;border-radius:8px;cursor:pointer;font-size:13px;word-break:break-all}
+.dlm-item:hover{background:var(--chip)}
+.dlm-foot{display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--line)}
+.cfg-ind .btn{padding:8px 14px;white-space:nowrap;flex:none}
+#btn-src,#btn-aria2-connect{min-width:86px}
+.stat{font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.stat.ok{background:#8dc215;color:#fff}
+.stat.err{background:#fdecec;color:#c0392b}
+#dl-conc{border:1px solid var(--line);border-radius:8px;padding:7px 6px;font-size:12px;
+         background:#fff;color:var(--ink);cursor:pointer}
+
+/* ---- slot 单选 ---- */
+.pills{display:flex;flex-wrap:wrap;gap:10px}
+.pill{border:1.5px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;
+      background:#fff;min-width:240px;display:flex;gap:10px;align-items:flex-start}
+.pill:hover{border-color:#c8cdd6}
+.pill:has(input:checked){border-color:var(--accent);background:#fff8f3;
+                         box-shadow:0 0 0 3px var(--accent-soft)}
+.pill input{accent-color:var(--accent);margin-top:3px;flex:none}
+.pill .t{font-weight:600}
+.pill .m{color:var(--muted);font-size:12px;margin-top:2px;word-break:break-all}
+.slottag{display:inline-block;padding:1px 11px;border-radius:999px;font-size:12px;
+            font-weight:600;border:1px solid;line-height:1.7;margin-right:2px}
+.slottag.st{color:#8dc215;border-color:rgba(141,194,21,.55);background:rgba(141,194,21,.12)}
+.slottag.pre{color:#ffbc44;border-color:rgba(255,188,68,.55);background:rgba(255,188,68,.12)}
+.slottag.prev{color:#b9cdd4;border-color:rgba(185,205,212,.45);background:rgba(185,205,212,.08)}
+
+/* ---- board 单选卡片 ---- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.cardpick{border:1.5px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;
+          background:#fff;display:flex;gap:10px;align-items:flex-start}
+.cardpick:hover{border-color:#c8cdd6}
+.cardpick:has(input:checked){border-color:var(--accent);background:#fff8f3;
+                             box-shadow:0 0 0 3px var(--accent-soft)}
+.cardpick input{accent-color:var(--accent);margin-top:3px;flex:none}
+.cardpick .t{font-family:var(--mono);font-weight:600;font-size:13px;word-break:break-all}
+.cardpick .m{color:var(--muted);font-size:12px;margin-top:2px}
+
+/* ---- 镜像类型多选 ---- */
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;
+     cursor:pointer;font-size:12px;color:var(--ink)}
+.btn:hover{border-color:#c8cdd6;background:#fafbfc}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#c9551d}
+.btn.green{background:#16a34a;border-color:#16a34a;color:#fff}
+.btn.green:hover{background:#15803d}
+.btn.lgreen{background:#b8e356;border-color:#b8e356;color:#2c3d10}
+.btn.lgreen:hover{background:#a9d63f}
+#btn-download,#btn-aria2-push{min-width:118px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+/* ---- 镜像类型多选: secgroup → modebox 层级 (对齐官方下载页) ---- */
+.secgroup{border:1px solid rgba(141,194,21,.45);border-radius:12px;padding:12px 12px 14px;
+          position:relative;background:rgba(141,194,21,.03);margin-top:16px}
+.secgroup:first-child{margin-top:6px}
+.ghead{display:flex;align-items:center;gap:8px;padding:0 2px 10px;cursor:pointer;
+       user-select:none;font-size:12px;color:var(--muted)}
+.secgroup .glabel{font-size:11px;font-weight:600;letter-spacing:1px;padding:0 8px;
+                  border-radius:4px;background:#8dc215;color:#fff}
+.secgroup.secure{border-color:rgba(217,58,58,.35);background:rgba(217,58,58,.025)}
+.secgroup.secure .glabel{background:#c0392b}
+.modeboxes{display:flex;flex-direction:column;gap:10px}
+.modebox{border:1px solid #c5d2da;border-radius:10px;padding:0 14px 6px}
+.modebox h3{font-size:13px;font-weight:700;color:#03353f;margin:0 -14px 8px;
+             padding:8px 14px 7px;background:rgba(3,53,63,.05);border-bottom:1px solid #c5d2da;
+             border-radius:9px 9px 0 0;letter-spacing:.3px;display:flex;align-items:center;gap:8px}
+.secgroup .modebox h3{background:rgba(141,194,21,.10);border-bottom-color:rgba(141,194,21,.30)}
+.secgroup.secure .modebox h3{background:rgba(217,58,58,.07);border-bottom-color:rgba(217,58,58,.25)}
+.modebox h3{cursor:pointer;user-select:none}
+.modebox h3:hover{filter:brightness(.97)}
+.modebox h3 .gc{margin-left:auto;font-weight:400;color:#7b8fa0;font-size:12px}
+.boxsub{color:#9db0ba;font-weight:400;font-size:12px}
+.modebox.loader h3{background:rgba(14,165,183,.16);border-bottom-color:rgba(14,165,183,.40)}
+.secgroup.secure .modebox.loader h3{background:rgba(217,58,58,.16);border-bottom-color:rgba(217,58,58,.45)}
+.lrows{display:flex;flex-direction:column;gap:4px;padding:8px 0}
+.row{display:flex;flex-direction:column;gap:7px;padding:9px 0}
+.row:not(:last-child){border-bottom:1px solid #d7dee5}
+.row-head{display:flex;align-items:baseline;gap:6px}
+.row-title{font-weight:700;font-size:14px;color:#51707c}
+.row-meta{color:#7b8fa0;font-size:12.5px}
+.row-links{display:flex;flex-wrap:wrap;align-items:center}
+.grp{display:inline-flex;align-items:center;gap:8px}
+.grp+.grp{margin-left:16px;padding-left:18px;border-left:1px solid #d7dee5}
+.trow{display:inline-flex;gap:8px;align-items:center;padding:4px 8px;border-radius:8px;cursor:pointer}
+.trow:hover{background:var(--chip)}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent);width:16px;height:16px;flex:none}
+.cnt{color:var(--muted);font-size:12px;white-space:nowrap}
+
+/* ---- 文件清单 ---- */
+#file-filter{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px;
+             width:240px;max-width:100%}
+#file-filter:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+#files-wrap{overflow:auto;max-height:460px;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;background:#fff}
+th{position:sticky;top:0;background:var(--chip);text-align:left;font-size:12px;color:var(--muted);
+   padding:8px 12px;border-bottom:1px solid var(--line);z-index:1}
+td{padding:7px 12px;border-bottom:1px solid #f0f1f4;vertical-align:top}
+td.path{font-family:var(--mono);font-size:12px;word-break:break-all;max-width:560px}
+td.path a{color:var(--accent);text-decoration:none}
+td.path a:hover{text-decoration:underline}
+td.size{white-space:nowrap;color:var(--muted);font-size:12px;text-align:right}
+td.act{white-space:nowrap;text-align:right}
+td.act button{border:none;background:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 6px;border-radius:6px}
+td.act button:hover{background:var(--chip);color:var(--ink)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+
+/* ---- 底部操作栏 / 提示 ---- */
+#actionbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;
+           border-top:1px solid var(--line);box-shadow:0 -4px 14px rgba(16,24,40,.06);
+           padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#actionbar .sum{margin-right:auto;color:var(--muted);font-size:13px}
+#actionbar .sum b{color:var(--ink)}
+#toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:30;
+       background:#171d2b;color:#fff;border-radius:99px;padding:9px 18px;font-size:13px;
+       box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw}
+/* ---- 结构化下载进度面板 ---- */
+#dlpanel{position:fixed;right:16px;bottom:70px;z-index:25;width:380px;max-width:calc(100vw - 32px);
+         background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+         box-shadow:0 8px 28px rgba(16,24,40,.14)}
+.dlp-head{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;margin-bottom:10px}
+.dlp-head #dlp-tag{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-all}
+.dlp-head .btn{margin-left:auto;padding:3px 10px;font-size:12px}
+.dlp-item{margin-bottom:7px}
+.dlp-item:last-child{margin-bottom:2px}
+.dlp-file,.dlp-total{display:flex;justify-content:space-between;gap:8px;font-size:12px;
+                     color:var(--ink);margin:0 0 3px}
+.dlp-file .n{flex:1;font-family:var(--mono);font-size:11px;word-break:break-all;min-width:0;
+             overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlp-x{border:none;background:none;cursor:pointer;color:var(--muted);font-size:12px;
+       line-height:1;padding:1px 3px;flex:none;border-radius:4px}
+.dlp-x:hover{color:#c0392b;background:#fdecec}
+.dlp-pct{color:var(--muted);white-space:nowrap}
+.dlp-bar{height:6px;background:var(--chip);border-radius:3px;overflow:hidden}
+.dlp-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;
+           transition:width .15s linear}
+#banner{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;
+        padding:12px 14px;margin-bottom:16px}
+.loading{padding:40px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <span class="brand">📦 Armbian Image Downloader</span>
+</header>
+
+<main>
+  <div id="banner" hidden><span id="banner-text"></span></div>
+
+  <section class="card">
+    <h2><i class="step">1</i>Setup</h2>
+    <div class="cfg-row"><span class="cfg-k">Source</span>
+      <span class="cfg-v"><span class="stat err" id="src-stat">Failed</span>
+        <span class="cfg-time" id="refresh-time"></span></span>
+    </div>
+    <div class="cfg-row cfg-ind">
+      <input id="src-input" type="url" spellcheck="false" placeholder="data.json URL">
+      <button id="btn-src" class="btn lgreen">Update</button>
+    </div>
+    <div class="cfg-row cfg-sep" id="row-save-to"><span class="cfg-k">Save to</span>
+      <span class="cfg-v">
+        <input id="dl-dir" type="text" spellcheck="false" placeholder="~/Downloads">
+        <button id="btn-dl-dir" class="btn lgreen">Select</button>
+      </span>
+    </div>
+    <div class="cfg-row cfg-sep"><span class="cfg-k">Aria2</span>
+      <span class="cfg-v"><span class="stat err" id="aria2-stat">Not Connected</span></span>
+    </div>
+    <div class="cfg-row cfg-ind">
+      <input id="aria2-url" type="url" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
+      <input id="aria2-token" type="password" placeholder="RPC secret" autocomplete="off">
+      <button id="btn-aria2-connect" class="btn lgreen">Connect</button>
+    </div>
+    <div class="cfg-row cfg-sep" id="row-parallel"><span class="cfg-k">Parallel</span>
+      <span class="cfg-v">
+        <select id="dl-conc" title="Concurrent downloads">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
+      </span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><i class="step">2</i>Select Build (slot) <span class="sub">single</span></h2>
+    <div id="slots" class="pills"><div class="loading">Loading…</div></div>
+  </section>
+
+  <section class="card">
+    <h2><i class="step">3</i>Select Board <span class="sub">single</span></h2>
+    <div id="boards" class="cards"><div class="empty">Select a slot first</div></div>
+  </section>
+
+  <section class="card">
+    <h2><i class="step">4</i>Select Image Types <span class="sub">multiple</span>
+      <span class="spacer"></span>
+      <button id="type-all" class="btn">All</button>
+      <button id="type-none" class="btn">None</button>
+    </h2>
+    <div id="types"><div class="empty">Select a board first</div></div>
+  </section>
+
+  <section class="card">
+    <h2><i class="step">5</i>Download List <span class="sub" id="files-sub"></span>
+      <span class="spacer"></span>
+      <input id="file-filter" type="search" placeholder="Filter filenames…">
+    </h2>
+    <div id="files-wrap"><div class="empty">-</div></div>
+  </section>
+</main>
+
+<div id="actionbar">
+  <span class="sum" id="sum">Nothing selected</span>
+  <button id="btn-copy-paths" class="btn" disabled>Copy Paths</button>
+  <button id="btn-copy-urls" class="btn" disabled>Copy URLs</button>
+  <button id="btn-curl" class="btn" disabled>Copy curl Script</button>
+  <button id="btn-export" class="btn" disabled>Export JSON</button>
+  <button id="btn-aria2-push" class="btn green" disabled>Push to aria2</button>
+  <button id="btn-download" class="btn primary" disabled>Web Download</button>
+</div>
+
+<div id="dlmodal" hidden>
+  <div class="dlm-card">
+    <div class="dlm-head">Select download folder<button id="dlm-close" class="btn">✕</button></div>
+    <div class="dlm-path" id="dlm-path">/</div>
+    <div class="dlm-list" id="dlm-list"></div>
+    <div class="dlm-foot">
+      <button id="dlm-cancel" class="btn">Cancel</button>
+      <button id="dlm-ok" class="btn lgreen">Choose</button>
+    </div>
+  </div>
+</div>
+
+<div id="dlpanel" hidden>
+  <div class="dlp-head">Downloading · <span id="dlp-tag"></span><button id="dlp-cancel" class="btn">Cancel</button></div>
+  <div id="dlp-files"></div>
+  <div class="dlp-total"><span id="dlp-count"></span><span id="dlp-totalpct" class="dlp-pct"></span></div>
+  <div class="dlp-bar"><i id="dlp-totalbar"></i></div>
+</div>
+
+<div id="toast" hidden></div>
+
+
+<script>
+'use strict';
+const DEFAULT_URL = 'https://seeed-studio.github.io/armbian-build/'; // 请求时自动拼接 data.json
+const SLOT_ORDER = ['stable', 'pre-release', 'history'];
+const CAT_ORDER = ['recovery', 'ab', 'loaders'];
+const CAT_LABEL = {recovery: 'Recovery', ab: 'A/B', loaders: 'Loader'};
+const KIND_ORDER = ['image', 'ota'];
+const KIND_LABEL = {image: 'Image', ota: 'OTA'};
+const FLAVOR_ORDER = ['minimal', 'desktop'];
+const LOADER_ORDER = ['maskrom', 'spi'];
+const LOADER_LABEL = {maskrom: 'Maskrom', spi: 'SPI Flash'};
+
+const state = {
+  url: null, meta: null, data: null,
+  tag: null, board: null, checked: new Set(), filter: '',
+  dlRoot: null, dlAbort: null, // 结构化下载: 已选目录句柄 / 进行中任务的取消器
+  dlConc: 2, // 同时下载的文件数
+  aria2Det: null, // /api/aria2 检测结果(配置文件提取的 RPC/密钥/下载根)
+  dlMode: null, dlDir: null, // 下载模式(server=服务端任务) / 服务端配置的下载根
+};
+
+const $ = s => document.querySelector(s);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+function human(b) {
+  if (b == null) return '-';
+  const u = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(b >= 100 || i === 0 ? 0 : 1) + ' ' + u[i];
+}
+function fmtDate(iso) {
+  return iso ? new Date(iso).toLocaleString('en-GB', {hour12: false}) : '';
+}
+// 数据源地址归一化: 不带 data.json 的目录地址自动拼接 (已显式以 .json 结尾则不改)
+function normalizeDataUrl(u) {
+  u = u.trim();
+  if (/\.json(\?|#|$)/i.test(u)) return u;
+  return u.replace(/\/+$/, '') + '/data.json';
+}
+
+/* ---------- 数据推导 (与 fetch_imgs.py 的 classify 保持一致) ---------- */
+
+function classify(parts) {
+  const fname = parts[parts.length - 1], cat = parts[2];
+  if (cat === 'loaders') { // 拆成 maskrom / spi 两个条目, 对齐官方页 Loader 框
+    const stem = fname.replace(/\.sha256$/, '').replace(/\.xz$/, '');
+    const it = /spi/.test(stem) ? 'spi' : (/maskrom/.test(stem) ? 'maskrom' : stem);
+    return [cat, it, '-'];
+  }
+  const kind = (parts.length === 5 && parts[3] === 'ota') ? 'ota' : 'image';
+  const flavor = fname.includes('desktop') ? 'desktop' : 'minimal';
+  return [cat, flavor, kind];
+}
+function manifest() {
+  return (state.data.manifests || {})[state.tag] || {files: {}, sizes: {}};
+}
+function slotList() {
+  // [{name, tag}] — stable/pre-release 各一项, history 展开
+  const out = [];
+  const slots = state.data.slots || {};
+  const names = Object.keys(slots).sort((a, b) =>
+    (SLOT_ORDER.indexOf(a) + 1 || 99) - (SLOT_ORDER.indexOf(b) + 1 || 99));
+  for (const name of names) {
+    const v = slots[name];
+    if (Array.isArray(v)) v.forEach((t, i) => out.push({name: name + '[' + i + ']', tag: t}));
+    else if (v) out.push({name, tag: v});
+  }
+  return out;
+}
+function boardList(files) {
+  return [...new Set(Object.keys(files).map(p => p.split('/')[0]))].sort();
+}
+// [{key, variant, cat, flavor, kind, count}] 按固定顺序
+function typeRows(files, board) {
+  const cnt = new Map();
+  for (const p of Object.keys(files)) {
+    const parts = p.split('/');
+    if (parts[0] !== board) continue;
+    const [cat, flavor, kind] = classify(parts);
+    const key = [parts[1], cat, flavor, kind].join('|');
+    cnt.set(key, (cnt.get(key) || 0) + 1);
+  }
+  const rows = [...cnt.entries()].map(([key, n]) => {
+    const [variant, cat, flavor, kind] = key.split('|');
+    return {key, variant, cat, flavor, kind, count: n};
+  });
+  const vi = v => v === 'plain' ? 0 : 1;
+  const ci = c => CAT_ORDER.indexOf(c);
+  const fi = r => r.cat === 'loaders' ? LOADER_ORDER.indexOf(r.flavor) : FLAVOR_ORDER.indexOf(r.flavor);
+  const ki = k => KIND_ORDER.indexOf(k);
+  rows.sort((a, b) => vi(a.variant) - vi(b.variant) || ci(a.cat) - ci(b.cat)
+                     || fi(a) - fi(b) || ki(a.kind) - ki(b.kind));
+  return rows;
+}
+function selectedFiles() {
+  const m = manifest(), out = [];
+  for (const [p, url] of Object.entries(m.files || {})) {
+    const parts = p.split('/');
+    if (parts[0] !== state.board) continue;
+    const [cat, flavor, kind] = classify(parts);
+    if (!state.checked.has([parts[1], cat, flavor, kind].join('|'))) continue;
+    out.push({path: p, url, size: (m.sizes || {})[p]});
+  }
+  out.sort((a, b) => a.path < b.path ? -1 : 1);
+  return state.filter
+    ? out.filter(f => f.path.toLowerCase().includes(state.filter)) : out;
+}
+
+/* ---------- 渲染 ---------- */
+
+function renderMeta() {
+  $('#refresh-time').textContent = state.meta ? fmtDate(state.meta.fetched_at) : '';
+  const stat = $('#src-stat');
+  if (state.meta) { stat.textContent = 'Updated'; stat.className = 'stat ok'; }
+  $('#src-input').value = state.url;
+}
+
+function renderSlots() {
+  const box = $('#slots');
+  box.textContent = '';
+  const rels = {};
+  for (const r of (state.data.releases || [])) rels[r.tag_name] = r;
+  for (const s of slotList()) {
+    const m = (state.data.manifests || {})[s.tag] || {};
+    const n = Object.keys(m.files || {}).length;
+    const label = el('label', 'pill');
+    const input = el('input'); input.type = 'radio'; input.name = 'slot';
+    input.checked = s.tag === state.tag;
+    input.addEventListener('change', () => { state.tag = s.tag; ensureSelection(); renderAll(); });
+    const body = el('div');
+    // slot 名做成 label 样式, 配色对齐官方页: stable 绿 / pre-release 琥珀 / history 灰
+    const slotCls = s.name === 'stable' ? 'st' : (s.name === 'pre-release' ? 'pre' : 'prev');
+    const t = el('div', 't');
+    t.append(el('span', 'slottag ' + slotCls, s.name), document.createTextNode('  ·  ' + s.tag));
+    const meta = el('div', 'm', [fmtDate(m.created), n + ' files'].filter(Boolean).join(' · '));
+    body.append(t, meta);
+    label.append(input, body);
+    box.append(label);
+  }
+}
+
+function renderBoards() {
+  const box = $('#boards');
+  box.textContent = '';
+  const files = manifest().files || {};
+  const boards = boardList(files);
+  if (!boards.length) { box.append(el('div', 'empty', 'No files in this slot')); return; }
+  for (const b of boards) {
+    const n = Object.keys(files).filter(p => p.split('/')[0] === b).length;
+    const variants = [...new Set(Object.keys(files)
+      .filter(p => p.split('/')[0] === b).map(p => p.split('/')[1]))].sort().join(' / ');
+    const label = el('label', 'cardpick');
+    const input = el('input'); input.type = 'radio'; input.name = 'board';
+    input.checked = b === state.board;
+    input.addEventListener('change', () => { state.board = b; ensureSelection(); renderAll(); });
+    const body = el('div');
+    body.append(el('div', 't', b), el('div', 'm', n + ' files · ' + variants));
+    label.append(input, body);
+    box.append(label);
+  }
+}
+
+function pruneChecks() { // 剔除当前 board 下已不存在的勾选
+  const avail = new Set(typeRows(manifest().files || {}, state.board).map(r => r.key));
+  for (const k of [...state.checked]) if (!avail.has(k)) state.checked.delete(k);
+}
+function ensureSelection() { // 换 slot/board 后: board 归位 + 剔除失效勾选
+  const boards = boardList(manifest().files || {});
+  if (!boards.includes(state.board)) state.board = boards[0] || null;
+  pruneChecks();
+}
+
+function renderTypes() {
+  const box = $('#types');
+  box.textContent = '';
+  if (!state.board) { box.append(el('div', 'empty', 'Select a board first')); return; }
+  const rows = typeRows(manifest().files || {}, state.board);
+  if (!rows.length) { box.append(el('div', 'empty', 'No files for this board')); return; }
+
+  const sumCnt = rs => rs.reduce((s, r) => s + r.count, 0);
+  const nSel = rs => rs.filter(r => state.checked.has(r.key)).length;
+  const toggleRows = rs => {
+    const all = rs.every(r => state.checked.has(r.key));
+    rs.forEach(r => all ? state.checked.delete(r.key) : state.checked.add(r.key));
+    renderTypes(); renderFiles();
+  };
+  // 组级三态 checkbox; 阻止冒泡, 点击语义由 change 处理
+  const triInput = rs => {
+    const cb = el('input'); cb.type = 'checkbox';
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', () => toggleRows(rs));
+    cb.checked = nSel(rs) === rs.length;
+    cb.indeterminate = nSel(rs) > 0 && nSel(rs) < rs.length;
+    return cb;
+  };
+  const leafInput = r => {
+    const input = el('input'); input.type = 'checkbox';
+    input.checked = state.checked.has(r.key);
+    input.addEventListener('change', () => {
+      input.checked ? state.checked.add(r.key) : state.checked.delete(r.key);
+      renderTypes(); renderFiles();
+    });
+    return input;
+  };
+  const leafLabel = (r, txt) => {
+    const label = el('label', 'trow');
+    label.append(leafInput(r), el('span', null, txt));
+    return label;
+  };
+
+  // 层级: secgroup(plain/secure) -> modebox(Recovery/A-B/Loader)
+  const variants = [...new Set(rows.map(r => r.variant))]
+    .sort((a, b) => (a === 'plain' ? 0 : 1) - (b === 'plain' ? 0 : 1));
+  for (const variant of variants) {
+    const vrows = rows.filter(r => r.variant === variant);
+    const group = el('div', 'secgroup' + (variant === 'secure' ? ' secure' : ''));
+    const ghead = el('label', 'ghead'); // 复选框在最前, 后跟 PLAIN/SECURE 标签, 右侧计数
+    ghead.append(triInput(vrows),
+                 el('span', 'glabel', variant === 'secure' ? 'SECURE' : 'PLAIN'),
+                 el('span', 'gc', nSel(vrows) + '/' + vrows.length));
+    group.append(ghead);
+
+    const inner = el('div', 'modeboxes');
+    const cats = [...new Set(vrows.map(r => r.cat))]
+      .sort((a, b) => CAT_ORDER.indexOf(a) - CAT_ORDER.indexOf(b));
+    for (const cat of cats) {
+      const crows = vrows.filter(r => r.cat === cat);
+      if (cat === 'loaders') { // 常显(无折叠), 青色标题带与其他 modebox 区分
+        const mb = el('div', 'modebox loader');
+        const h3 = el('h3');
+        h3.addEventListener('click', () => toggleRows(crows));
+        h3.append(triInput(crows),
+                  el('span', null, CAT_LABEL[cat]),
+                  el('span', 'boxsub', ' - maskrom / SPI flash'),
+                  el('span', 'gc', nSel(crows) + '/' + crows.length));
+        mb.append(h3);
+        const lrows = el('div', 'lrows');
+        for (const r of crows)
+          lrows.append(leafLabel(r, LOADER_LABEL[r.flavor] || r.flavor));
+        mb.append(lrows);
+        inner.append(mb);
+        continue;
+      }
+      const mb = el('div', 'modebox');
+      const h3 = el('h3');
+      h3.addEventListener('click', () => toggleRows(crows));
+      h3.append(triInput(crows),
+                el('span', null, CAT_LABEL[cat] || cat),
+                el('span', 'boxsub', ' · ' + sumCnt(crows) + ' files'),
+                el('span', 'gc', nSel(crows) + '/' + crows.length));
+      mb.append(h3);
+      for (const fl of FLAVOR_ORDER) {
+        const frows = crows.filter(r => r.flavor === fl);
+        if (!frows.length) continue;
+        const row = el('div', 'row');
+        const head = el('div', 'row-head');
+        head.append(el('span', 'row-title', fl),
+                    el('span', 'row-meta', sumCnt(frows) + ' files'));
+        const links = el('div', 'row-links');
+        for (const kind of KIND_ORDER) {
+          const r = frows.find(x => x.kind === kind);
+          if (!r) continue;
+          const grp = el('span', 'grp');
+          grp.append(leafLabel(r, KIND_LABEL[kind]), el('span', 'cnt', r.count + ''));
+          links.append(grp);
+        }
+        row.append(head, links);
+        mb.append(row);
+      }
+      inner.append(mb);
+    }
+    group.append(inner);
+    box.append(group);
+  }
+}
+
+function renderFiles() {
+  const wrap = $('#files-wrap');
+  wrap.textContent = '';
+  const files = selectedFiles();
+  const total = files.reduce((s, f) => s + (f.size || 0), 0);
+  $('#files-sub').textContent = files.length
+    ? files.length + ' files · ' + human(total) : '0 files';
+  const bar = files.length ? 'Selected <b>' + files.length + '</b> files · ' + human(total) : 'Nothing selected';
+  $('#sum').innerHTML = bar; // 仅内部拼接, 无外部数据
+  for (const id of ['#btn-copy-paths', '#btn-copy-urls', '#btn-curl',
+                    '#btn-export', '#btn-aria2-push', '#btn-download'])
+    $(id).disabled = !files.length;
+  if (!files.length) { wrap.append(el('div', 'empty', 'No matching files — check image types or adjust the filter')); return; }
+  const table = el('table');
+  const thead = el('thead');
+  const hr = el('tr');
+  ['File (click to download)', 'Size', ''].forEach((t, i) => {
+    const th = el('th', i === 1 ? 'size' : (i === 2 ? 'act' : null), t);
+    th.style.textAlign = i === 0 ? 'left' : 'right';
+    hr.append(th);
+  });
+  thead.append(hr); table.append(thead);
+  const tbody = el('tbody');
+  for (const f of files) {
+    const tr = el('tr');
+    const td1 = el('td', 'path');
+    const a = el('a', null, f.path); a.href = f.url; a.target = '_blank'; a.rel = 'noopener';
+    td1.append(a);
+    const td2 = el('td', 'size', human(f.size));
+    const td3 = el('td', 'act');
+    const cp = el('button', null, '⧉'); cp.title = 'Copy this file URL';
+    cp.addEventListener('click', () => copyText(f.url, 'URL copied'));
+    td3.append(cp);
+    tr.append(td1, td2, td3);
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+}
+
+function renderAll() { renderSlots(); renderBoards(); renderTypes(); renderFiles(); }
+
+/* ---------- 动作 ---------- */
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+}
+function copyText(text, okMsg) {
+  const done = () => toast(okMsg || 'Copied');
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { toast('Copy failed, please select manually'); }
+  ta.remove();
+}
+
+function curlScript(files) {
+  const tag = state.tag;
+  const lines = ['# ' + tag + ' / ' + state.board + ' — ' + files.length + ' files',
+                 '# Run from the target root; tree: tag/board/variant/category/[ota/]; rerun to resume'];
+  const dirs = [...new Set(files.map(f => tag + '/' + f.path.split('/').slice(0, -1).join('/')))].sort();
+  dirs.forEach(d => lines.push("mkdir -p '" + d + "'"));
+  files.forEach(f => lines.push("curl -fL --retry 3 -C - -o '" + tag + '/' + f.path + "' '" + f.url + "'"));
+  return lines.join('\n');
+}
+function aria2Entries(files, base) { // 目录树: base + tag/板卡/变体/类目/[ota/]
+  const tag = state.tag;
+  return files.map(f => {
+    const segs = f.path.split('/');
+    return {url: f.url, dir: base + tag + '/' + segs.slice(0, -1).join('/'),
+            out: segs[segs.length - 1]};
+  });
+}
+async function aria2Push(files) {
+  const endpoint = $('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc';
+  const token = $('#aria2-token').value.trim();
+  localStorage.setItem('aria2-url', $('#aria2-url').value.trim()); // 存原始输入: 清空即回退自动检测
+  localStorage.setItem('aria2-token', token);
+  // 推送目标与检测到的实例一致时, 用其配置的下载根拼绝对路径(任务不依赖 aria2 守护进程的 cwd)
+  const det = state.aria2Det || {};
+  const same = det.endpoint && endpoint.replace(/\/+$/, '') === det.endpoint.replace(/\/+$/, '');
+  const base = (same && det.downloaddir) ? det.downloaddir.replace(/\/+$/, '') + '/' : '';
+  const entries = aria2Entries(files, base);
+  toast('Pushing ' + files.length + ' tasks to aria2…');
+  try {
+    if (state.localServer) {
+      const resp = await fetch('/api/rpc', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({endpoint, token, files: entries}),
+      });
+      const j = await resp.json();
+      if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+      if (j.errors && j.errors.length) toast('Pushed ' + j.ok + ', failed: ' + j.errors[0]);
+      else toast('Pushed ' + j.ok + ' tasks → ' + endpoint.replace(/^https?:\/\//, '')
+               + (base ? ' · ' + base + state.tag + '/' : ' · ' + state.tag + '/'));
+    } else { // 直连逐条推送
+      let ok = 0; const errs = [];
+      for (const e of entries) {
+        try {
+          const resp = await fetch(endpoint, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: 'aria2.addUri',
+                                  params: [token ? 'token:' + token : null,
+                                           [e.url],
+                                           {dir: e.dir, out: e.out, continue: true,
+                                            'max-tries': 8, 'retry-wait': 5}].filter(p => p !== null)}),
+          });
+          const j = await resp.json();
+          if (j.error) throw new Error(j.error.message || 'rpc error');
+          ok++;
+        } catch (er) { errs.push(e.out + ': ' + er.message); }
+      }
+      if (errs.length) toast('Pushed ' + ok + ', failed: ' + errs[0]);
+      else toast('Pushed ' + ok + ' tasks → ' + endpoint.replace(/^https?:\/\//, '')
+               + ' · ' + state.tag + '/ (relative to aria2 dir)');
+    }
+  } catch (e) {
+    toast('Push failed: ' + e.message);
+  }
+}
+async function aria2Check() {
+  // 连通性检测: 状态标签显示 Connected / Not Connected
+  const stat = $('#aria2-stat');
+  const endpoint = $('#aria2-url').value.trim();
+  if (!endpoint) { stat.textContent = 'Not Connected'; stat.className = 'stat err'; return; }
+  const token = $('#aria2-token').value.trim();
+  try {
+    let err = null;
+    if (state.localServer) {
+      const resp = await fetch('/api/rpc', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({endpoint, token, method: 'aria2.getVersion'}),
+      });
+      const j = await resp.json();
+      err = j.error;
+    } else { // 直连: aria2 需 rpc-allow-origin-all=true
+      const resp = await fetch(endpoint, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web',
+                              method: 'aria2.getVersion',
+                              params: token ? ['token:' + token] : []}),
+      });
+      const j = await resp.json();
+      err = (j.error || {}).message;
+    }
+    if (err) throw new Error(err);
+    stat.textContent = 'Connected';
+    stat.className = 'stat ok';
+  } catch (e) {
+    stat.textContent = 'Not Connected';
+    stat.className = 'stat err';
+  }
+}
+function exportJson(files) {
+  const obj = {
+    source: state.url, slot_tag: state.tag, board: state.board,
+    types: [...state.checked],
+    files: files.map(f => ({path: f.path, url: f.url, size: f.size})),
+  };
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'imgs-' + state.tag + '-' + state.board + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function downloadIframe(files) {
+  const total = files.reduce((s, f) => s + (f.size || 0), 0);
+  toast('Triggered ' + files.length + ' downloads (' + human(total)
+      + '); if the browser blocks them, use the curl script');
+  files.forEach((f, i) => setTimeout(() => {
+    // 隐藏 iframe 触发下载: a[target=_blank] 在 setTimeout 里脱离用户手势,
+    // 第二个起会被弹窗拦截(实测只下载一个); iframe 导航不受弹窗拦截,
+    // 也不会残留空白标签页. 1s 间隔避免 SharePoint 直链兑换竞态.
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = f.url;
+    document.body.appendChild(iframe);
+    setTimeout(() => iframe.remove(), 10 * 60 * 1000); // 浏览器接管下载后再清理
+  }, i * 1000));
+}
+
+/* ---------- 结构化下载: File System Access API, 目录树 <tag>/<board>/<sec>/<cat>/[ota/]<file> ---------- */
+
+function safeSeg(s) { // 路径段清洗: 防路径穿越
+  return s.replace(/[\/\\\0]/g, '_').replace(/^\.+$/, '_') || '_';
+}
+
+async function pickRootDir() {
+  // 同一会话内复用已选目录; 权限被吊销时重新请求(需在用户手势内)
+  if (state.dlRoot) {
+    if (await state.dlRoot.queryPermission({mode: 'readwrite'}) === 'granted') return state.dlRoot;
+    if (await state.dlRoot.requestPermission({mode: 'readwrite'}) === 'granted') return state.dlRoot;
+    state.dlRoot = null;
+  }
+  state.dlRoot = await window.showDirectoryPicker({mode: 'readwrite'});
+  return state.dlRoot;
+}
+
+async function writeFileBody(fh, resp, from, onChunk) {
+  // from>0: 断点续传, 在原文件 seek 位置续写; 中止/出错 abort 丢弃本次改动
+  const w = await fh.createWritable({keepExistingData: from > 0});
+  const reader = resp.body.getReader();
+  try {
+    if (from > 0) await w.seek(from);
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      await w.write(value);
+      onChunk && onChunk(value.length);
+    }
+    await w.close();
+  } catch (e) {
+    try { await w.abort(); } catch (e2) {} // 放弃可写流, 不提交半截内容
+    throw e;
+  }
+}
+
+function dlPanelShow(tag, total) {
+  $('#dlp-tag').textContent = tag;
+  $('#dlp-files').textContent = '';
+  $('#dlp-count').textContent = '0/' + total;
+  $('#dlp-totalbar').style.width = '0';
+  $('#dlp-totalpct').textContent = '';
+  $('#dlpanel').hidden = false;
+}
+function dlPanelHide() { $('#dlpanel').hidden = true; }
+
+async function downloadStructured(files) {
+  const tag = state.tag;
+  const root = await pickRootDir();
+  const ctrl = new AbortController();
+  state.dlAbort = ctrl;
+  const conc = state.dlConc || 2;
+  dlPanelShow(tag, files);
+  const totalAll = files.reduce((s, f) => s + (f.size || 0), 0);
+  let doneAll = 0, bytesAll = 0, skipped = 0, cancelled = 0; // 完成 / 累计字节 / 跳过(已完成) / 单独取消
+  const failed = [];
+  let next = 0; // 队列指针, worker 间共享(单线程 JS, 取号安全)
+
+  let speed = 0, spT = Date.now(), spB = 0; // 速度: 窗口采样 + 平滑
+  const updateTotals = () => {
+    const now = Date.now(), dt = (now - spT) / 1000;
+    if (dt >= 0.4) {
+      const v = (bytesAll - spB) / dt;
+      speed = speed ? speed * 0.6 + v * 0.4 : v;
+      spT = now; spB = bytesAll;
+    }
+    $('#dlp-count').textContent = doneAll + '/' + files.length;
+    if (totalAll) $('#dlp-totalbar').style.width = (bytesAll / totalAll * 100).toFixed(1) + '%';
+    $('#dlp-totalpct').textContent = human(bytesAll) + ' / ' + human(totalAll)
+      + (speed > 0 ? ' · ' + human(speed) + '/s' : '');
+  };
+
+  async function worker(wid) {
+    if (wid) await new Promise(r => setTimeout(r, wid * 600)); // 错开首文件, 避免直链兑换竞态
+    while (!ctrl.signal.aborted) {
+      const i = next++;
+      if (i >= files.length) return;
+      const f = files[i];
+      const fctrl = new AbortController(); // 单文件取消; 全局取消时联动
+      ctrl.signal.addEventListener('abort', () => fctrl.abort(), {once: true});
+      const segs = [tag, ...f.path.split('/').map(safeSeg)];
+      const item = el('div', 'dlp-item');
+      const fname = el('div', 'dlp-file');
+      const n = el('span', 'n', segs.slice(1).join('/'));
+      const pct = el('span', 'dlp-pct');
+      const x = el('button', 'dlp-x', '✕');
+      x.title = 'Cancel this file';
+      x.addEventListener('click', () => fctrl.abort());
+      fname.append(n, pct, x);
+      const bar = el('div', 'dlp-bar');
+      const barFill = el('i');
+      bar.append(barFill);
+      item.append(fname, bar);
+      $('#dlp-files').append(item);
+      let got = 0, lastPaint = 0;
+      const expected = f.size || 0;
+      const paint = (fileBytes, clen) => { // 节流, 大文件 64KiB 块很多
+        const now = Date.now();
+        if (now - lastPaint < 150) return;
+        lastPaint = now;
+        if (clen) barFill.style.width = (fileBytes / clen * 100).toFixed(1) + '%';
+        pct.textContent = human(fileBytes) + (clen ? ' / ' + human(clen) : '');
+        updateTotals();
+      };
+      try {
+        let dir = root;
+        for (const s of segs.slice(0, -1)) dir = await dir.getDirectoryHandle(s, {create: true});
+        const fh = await dir.getFileHandle(segs[segs.length - 1], {create: true});
+        let have = 0;
+        try { have = (await fh.getFile()).size; } catch (e) {}
+        if (expected && have >= expected) { // 已完整: 跳过
+          skipped++;
+          item.remove();
+          doneAll++;
+          updateTotals();
+          continue;
+        }
+        const headers = (expected && have > 0) ? {Range: 'bytes=' + have + '-'} : undefined;
+        const resp = await fetch('/api/proxy?url=' + encodeURIComponent(f.url),
+                                 {signal: fctrl.signal, headers});
+        if (!resp.body || (resp.status !== 200 && resp.status !== 206))
+          throw new Error('HTTP ' + resp.status);
+        const from = resp.status === 206 ? have : 0; // 200 = 远端不支持续传, 整文件重下
+        got = from;
+        bytesAll += from;
+        const clen = +(resp.headers.get('Content-Length') || 0);
+        const total = (from + clen) || expected;
+        await writeFileBody(fh, resp, from, x => {
+          got += x; bytesAll += x;
+          paint(got, total);
+        });
+      } catch (e) {
+        if (fctrl.signal.aborted && !ctrl.signal.aborted) cancelled++; // 用户单独取消该文件
+        else if (!ctrl.signal.aborted) failed.push(f.path + ': ' + e.message);
+      }
+      item.remove();
+      doneAll++;
+      updateTotals();
+    }
+  }
+
+  try {
+    await Promise.all([...Array(conc)].map((_, i) => worker(i)));
+  } finally {
+    state.dlAbort = null;
+    dlPanelHide();
+  }
+  if (ctrl.signal.aborted) { toast('Download cancelled (' + doneAll + ' files done)'); return; }
+  const note = (skipped ? ', skipped ' + skipped + ' complete' : '')
+             + (cancelled ? ', cancelled ' + cancelled : '');
+  if (failed.length) toast('Done ' + (doneAll - skipped - cancelled - failed.length)
+                         + ', failed ' + failed.length + note + ': ' + failed[0]);
+  else toast('Downloaded ' + (doneAll - skipped - cancelled) + ' files' + note + ' → ' + tag + '/ tree');
+}
+
+/* ---------- 服务端下载: 按 Setup 配置的 Save to 目录落盘, 目录树 <dir>/<tag>/<board>/<sec>/<cat>/[ota/]<file> ---------- */
+
+async function downloadServer(files) {
+  const body = JSON.stringify({
+    conc: state.dlConc || 2,
+    files: files.map(f => ({dest: state.tag + '/' + f.path, url: f.url, size: f.size || 0})),
+  });
+  let resp, j;
+  try {
+    resp = await fetch('/api/download', {method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body});
+    j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+  } catch (e) {
+    if (resp && resp.status === 404) throw e; // 旧版服务端无此接口, 由上层回退
+    toast('Server download failed: ' + e.message);
+    return;
+  }
+  dlPanelShow(state.tag, files.length);
+  return pollServerJob(j.base || '');
+}
+
+async function pollServerJob(base) { // 轮询 /api/job 直到结束; base 用于完成提示
+  state.dlMode = 'server';
+  let speed = 0, spT = Date.now(), spB = 0; // 速度: 窗口采样 + 平滑(与浏览器模式同款)
+  const rows = new Map(); // name -> 行元素
+  while (true) {
+    await new Promise(r => setTimeout(r, 600));
+    let job;
+    try {
+      job = await (await fetch('/api/job')).json();
+    } catch (e) { continue; }
+    const now = Date.now(), dt = (now - spT) / 1000;
+    if (dt >= 0.4) {
+      const v = (job.bytes_done - spB) / dt;
+      speed = speed ? speed * 0.6 + v * 0.4 : v;
+      spT = now; spB = job.bytes_done;
+    }
+    // 同步进行中行(服务端 active 列表)
+    const seen = new Set();
+    for (const a of job.active || []) {
+      seen.add(a.name);
+      let r = rows.get(a.name);
+      if (!r) {
+        const item = el('div', 'dlp-item');
+        const fr = el('div', 'dlp-file');
+        const n = el('span', 'n', a.name.replace(/^\d{6}-\d{6}\//, ''));
+        const pct = el('span', 'dlp-pct');
+        fr.append(n, pct);
+        const bar = el('div', 'dlp-bar');
+        const fill = el('i');
+        bar.append(fill);
+        item.append(fr, bar);
+        $('#dlp-files').append(item);
+        r = {item, pct, fill};
+        rows.set(a.name, r);
+      }
+      if (a.total) r.fill.style.width = (a.got / a.total * 100).toFixed(1) + '%';
+      r.pct.textContent = human(a.got) + (a.total ? ' / ' + human(a.total) : '');
+    }
+    for (const [name, r] of rows) if (!seen.has(name)) { r.item.remove(); rows.delete(name); }
+    $('#dlp-count').textContent = job.done + '/' + job.total;
+    if (job.bytes_total)
+      $('#dlp-totalbar').style.width = (job.bytes_done / job.bytes_total * 100).toFixed(1) + '%';
+    $('#dlp-totalpct').textContent = human(job.bytes_done) + ' / ' + human(job.bytes_total)
+      + (speed > 0 ? ' · ' + human(speed) + '/s' : '');
+    if (!job.running) {
+      dlPanelHide();
+      state.dlMode = null;
+      const note = (job.skipped ? ', skipped ' + job.skipped + ' complete' : '');
+      if (job.status === 'cancelled') { toast('Download cancelled (' + job.done + ' files done)'); return; }
+      if (job.errors && job.errors.length)
+        toast('Done ' + (job.done - job.skipped - job.errors.length) + ', failed '
+            + job.errors.length + note + ': ' + job.errors[0]);
+      else toast('Downloaded ' + (job.done - job.skipped) + ' files' + note
+               + (base ? ' → ' + base + '/' + state.tag + '/ tree' : ''));
+      return;
+    }
+  }
+}
+
+async function downloadAll(files) {
+  if (state.localServer) { // 服务端与浏览器代理模式都依赖本地 serve.py
+    try {
+      await downloadServer(files); // 首选: 服务端按 Save to 配置落盘
+      return;
+    } catch (e) { /* 无 /api/download(旧服务端) → 回退浏览器目录选择 */ }
+  if (window.showDirectoryPicker) {
+    try {
+      await downloadStructured(files); // 目录树 <tag>/<board>/<variant>/<cat>/[ota/]<file>
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // 用户取消目录选择
+      console.warn('structured download failed, falling back to browser downloads:', e);
+    }
+  }
+  } else {
+    toast('Static mode: browser default downloads; use Push to aria2 for the directory tree');
+  }
+  downloadIframe(files);
+}
+
+/* ---------- 加载 ---------- */
+
+function showError(msg) {
+  $('#banner-text').textContent = msg;
+  $('#banner').hidden = false;
+}
+async function loadData(refresh) {
+  $('#banner').hidden = true;
+  try {
+    if (state.localServer) {
+      const qs = '/api/data?url=' + encodeURIComponent(normalizeDataUrl(state.url))
+               + (refresh ? '&refresh=1' : '');
+      const resp = await fetch(qs);
+      const j = await resp.json();
+      if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+      state.data = j.data; state.meta = j.meta;
+    } else { // 纯静态(GitHub Pages 等): 直连数据源, 须同源或对方开 CORS
+      const u = new URL(normalizeDataUrl(state.url), location.href);
+      if (refresh) u.searchParams.set('t', Date.now()); // 缓存穿透
+      const resp = await fetch(u);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      state.data = await resp.json();
+      state.meta = {url: u.href, cached: false, fetched_at: new Date().toISOString()};
+    }
+    const slots = slotList();
+    if (!slots.length) throw new Error('no slots in data source');
+    if (!slots.some(s => s.tag === state.tag)) state.tag = slots[0].tag;
+    ensureSelection();
+    renderAll(); renderMeta();
+    return true;
+  } catch (e) {
+    showError('Failed to fetch data: ' + e.message
+      + (state.data ? ' (current data kept)'
+                    : (location.protocol === 'file:' ? ' (opened as file://, run python3 web/serve.py first)' : '')));
+    const stat = $('#src-stat');
+    stat.textContent = 'Failed';
+    stat.className = 'stat err';
+    if (!state.data) { // 首次加载失败才清空; 刷新失败保留现有页面
+      ['#slots', '#boards', '#types', '#files-wrap'].forEach(s => { $(s).textContent = ''; });
+    }
+    return false;
+  }
+}
+
+$('#btn-src').addEventListener('click', async () => {
+  const v = $('#src-input').value.trim();
+  if (!/^https?:\/\//i.test(v)) { toast('Data source must be an http(s) URL'); return; }
+  state.url = v;
+  const u = new URL(location);
+  u.searchParams.set('url', v);
+  history.replaceState(null, '', u); // 地址栏固化 ?url=, 不整页跳转
+  toast('Fetching latest data…');
+  if (await loadData(true)) toast('Data refreshed · ' + fmtDate(state.meta.fetched_at));
+});
+$('#src-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-src').click(); });
+$('#type-all').addEventListener('click', () => {
+  typeRows(manifest().files || {}, state.board).forEach(r => state.checked.add(r.key));
+  renderTypes(); renderFiles();
+});
+$('#type-none').addEventListener('click', () => { state.checked.clear(); renderTypes(); renderFiles(); });
+$('#file-filter').addEventListener('input', e => { state.filter = e.target.value.trim().toLowerCase(); renderFiles(); });
+$('#btn-copy-paths').addEventListener('click', () => copyText(selectedFiles().map(f => f.path).join('\n'), 'Paths copied'));
+$('#btn-copy-urls').addEventListener('click', () => copyText(selectedFiles().map(f => f.url).join('\n'), 'URLs copied'));
+$('#btn-curl').addEventListener('click', () => copyText(curlScript(selectedFiles()), 'curl script copied'));
+$('#btn-aria2-push').addEventListener('click', () => aria2Push(selectedFiles()));
+$('#btn-aria2-connect').addEventListener('click', () => aria2Check());
+// RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
+$('#aria2-url').value = localStorage.getItem('aria2-url') || '';
+$('#aria2-token').value = localStorage.getItem('aria2-token') || '';
+fetch('/api/aria2').then(r => r.json()).then(det => {
+  state.aria2Det = det;
+  if (!$('#aria2-url').value) { // 手动输入优先, 为空才用配置文件
+    $('#aria2-url').value = det.endpoint || '';
+    $('#aria2-token').value = det.token || '';
+  }
+  aria2Check();
+}).catch(() => { aria2Check(); });
+$('#aria2-url').addEventListener('change', aria2Check);
+$('#aria2-token').addEventListener('change', aria2Check);
+$('#btn-export').addEventListener('click', () => exportJson(selectedFiles()));
+$('#btn-download').addEventListener('click', () => downloadAll(selectedFiles()));
+$('#dlp-cancel').addEventListener('click', () => {
+  if (state.dlMode === 'server') { fetch('/api/job/cancel', {method: 'POST'}); return; }
+  if (state.dlAbort) state.dlAbort.abort();
+});
+// Save to: 单个 editbox(可手输, 回车保存) + Select 弹窗浏览服务端目录
+const tilde = p => (p || '').replace(/^\/home\/[^/]+/, '~');
+fetch('/api/config').then(r => r.json()).then(c => {
+  state.dlDir = c.dl_dir;
+  $('#dl-dir').value = c.dl_dir || '';
+}).catch(() => {});
+async function saveDlDir(v) {
+  if (!v) { toast('Download dir is required'); return; }
+  try {
+    const resp = await fetch('/api/config', {method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify({dl_dir: v})});
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    state.dlDir = j.dl_dir;
+    $('#dl-dir').value = j.dl_dir;
+    toast('Download dir: ' + tilde(j.dl_dir));
+  } catch (e) {
+    toast('Save failed: ' + e.message);
+  }
+}
+$('#dl-dir').addEventListener('keydown', e => { if (e.key === 'Enter') saveDlDir($('#dl-dir').value.trim()); });
+
+let dlmCurrent = null;
+async function browseLoad(p) {
+  try {
+    const j = await (await fetch('/api/browse?path=' + encodeURIComponent(p))).json();
+    if (j.error) { toast('Browse failed: ' + j.error); return; }
+    dlmCurrent = j.path;
+    $('#dlm-path').textContent = j.path;
+    const list = $('#dlm-list');
+    list.textContent = '';
+    const add = (label, target, choose) => {
+      const it = el('div', 'dlm-item', label);
+      it.addEventListener('click', () => choose ? dlmChoose(target) : browseLoad(target));
+      list.append(it);
+    };
+    if (j.parent) add('📁 ..', j.parent);
+    for (const d of j.dirs)
+      add('📁 ' + d, j.path === '/' ? '/' + d : j.path + '/' + d);
+  } catch (e) {
+    toast('Browse failed: ' + e.message);
+  }
+}
+function dlmChoose(p) {
+  $('#dlmodal').hidden = true;
+  saveDlDir(p);
+}
+$('#btn-dl-dir').addEventListener('click', () => {
+  $('#dlmodal').hidden = false;
+  browseLoad(state.dlDir || '~');
+});
+$('#dlm-ok').addEventListener('click', () => { if (dlmCurrent) dlmChoose(dlmCurrent); });
+const dlmClose = () => { $('#dlmodal').hidden = true; };
+$('#dlm-close').addEventListener('click', dlmClose);
+$('#dlm-cancel').addEventListener('click', dlmClose);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#dlmodal').hidden) dlmClose(); });
+// 空闲时探测运行中的服务端任务(其他标签页/脚本发起的), 自动挂载进度显示
+setInterval(async () => {
+  if (!state.localServer || state.dlMode || !$('#dlpanel').hidden) return;
+  try {
+    const j = await (await fetch('/api/job')).json();
+    if (j.running) {
+      dlPanelShow('server job', j.total);
+      pollServerJob('').catch(() => {});
+    }
+  } catch (e) {}
+}, 2000);
+const concSel = $('#dl-conc');
+concSel.value = localStorage.getItem('dl-conc') || '2';
+concSel.addEventListener('change', () => {
+  state.dlConc = +concSel.value;
+  localStorage.setItem('dl-conc', concSel.value);
+});
+state.dlConc = +concSel.value || 2;
+
+(async () => { // 环境检测: 本地 serve.py(全功能) / 纯静态(GitHub Pages, 降级)
+  let local = false;
+  try {
+    const r = await fetch('api/config');
+    local = r.ok && (r.headers.get('content-type') || '').includes('json');
+  } catch (e) {}
+  state.localServer = local;
+  document.body.classList.toggle('static', !local);
+  const q = new URLSearchParams(location.search).get('url');
+  state.url = q || (local ? DEFAULT_URL : new URL('../data.json', location.href).href);
+  loadData();
+})();
+</script>
+</body>
+</html>

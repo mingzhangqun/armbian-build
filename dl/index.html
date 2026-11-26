@@ -196,6 +196,9 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 </style>
 </head>
 <body>
+<script>/* 首帧同步预判模式: 非 localhost 先按静态(隐藏 Save to/Parallel), 避免刷新闪烁; 异步检测后再纠正 */
+if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body.className = 'static';
+</script>
 
 <header id="topbar">
   <span class="brand">📦 Armbian Image Downloader</span>

@@ -827,7 +827,9 @@ async function writeFileBody(fh, resp, from, onChunk) {
     }
     await w.close();
   } catch (e) {
-    try { await w.abort(); } catch (e2) {} // 放弃可写流, 不提交半截内容
+    // 尽力提交已写入的有效前缀(分块完整, 是合法的字节前缀), 下次 Range 从更大偏移续传;
+    // 提交本身失败(如磁盘满)才整体丢弃本次改动
+    try { await w.close(); } catch (e2) { try { await w.abort(); } catch (e3) {} }
     throw e;
   }
 }
@@ -1046,7 +1048,11 @@ async function downloadAll(files) {
       await downloadStructured(files, !state.localServer);
       return;
     } catch (e) {
-      if (e && e.name === 'AbortError') return; // 用户取消目录选择
+      if (e && e.name === 'AbortError') { // 取消: Chrome 拒绝目录("contains system files")时也会走到这
+        toast('Cancelled. Tip: pick a clean/empty folder (e.g. ~/Downloads/armbian) — '
+             + 'files are saved under <folder>/' + state.tag + '/…');
+        return;
+      }
       console.warn('structured download failed, falling back:', e);
       toast('Tree download failed: ' + e.message + '; using browser default downloads');
     }

@@ -119,7 +119,8 @@ body:not(.has-aria2) #btn-aria2-push{display:none}
                   border-radius:4px;background:#8dc215;color:#fff}
 .secgroup.secure{border-color:rgba(217,58,58,.35);background:rgba(217,58,58,.025)}
 .secgroup.secure .glabel{background:#c0392b}
-.modeboxes{display:flex;flex-direction:column;gap:10px}
+.modeboxes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:stretch}
+@media (max-width:900px){.modeboxes{grid-template-columns:1fr}}
 .modebox{border:1px solid #c5d2da;border-radius:10px;padding:0 14px 6px}
 .modebox h3{font-size:13px;font-weight:700;color:#03353f;margin:0 -14px 8px;
              padding:8px 14px 7px;background:rgba(3,53,63,.05);border-bottom:1px solid #c5d2da;
@@ -672,7 +673,7 @@ function aria2Entries(files, base) { // 目录树: base + tag/板卡/变体/类�
             out: segs[segs.length - 1]};
   });
 }
-async function aria2Push(files) {
+async function aria2Push(files, pickDir) {
   const endpoint = $('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc';
   const token = $('#aria2-token').value.trim();
   localStorage.setItem('aria2-url', $('#aria2-url').value.trim()); // 存原始输入: 清空即回退自动检测
@@ -680,7 +681,8 @@ async function aria2Push(files) {
   // 推送目标与检测到的实例一致时, 用其配置的下载根拼绝对路径(任务不依赖 aria2 守护进程的 cwd)
   const det = state.aria2Det || {};
   const same = det.endpoint && endpoint.replace(/\/+$/, '') === det.endpoint.replace(/\/+$/, '');
-  const base = (same && det.downloaddir) ? det.downloaddir.replace(/\/+$/, '') + '/' : '';
+  let base = (same && det.downloaddir) ? det.downloaddir.replace(/\/+$/, '') + '/' : '';
+  if (pickDir) base = pickDir.replace(/\/+$/, '') + '/'; // 弹窗选择的绝对目录优先
   const entries = aria2Entries(files, base);
   toast('Pushing ' + files.length + ' tasks to aria2…');
   try {
@@ -712,9 +714,17 @@ async function aria2Push(files) {
           ok++;
         } catch (er) { errs.push(e.out + ': ' + er.message); }
       }
+      let root = '';
+      try { // 取 aria2 全局下载根, toast 显示实际落盘目录
+        const g = await fetch(endpoint, {method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: 'aria2.getGlobalOption',
+                                params: token ? ['token:' + token] : []})});
+        const gj = await g.json();
+        root = ((gj.result && gj.result.dir) || '').replace(/\/+$/, '');
+      } catch (e) {}
       if (errs.length) toast('Pushed ' + ok + ', failed: ' + errs[0]);
-      else toast('Pushed ' + ok + ' tasks → ' + endpoint.replace(/^https?:\/\//, '')
-               + ' · ' + state.tag + '/ (relative to aria2 dir)');
+      else toast('Pushed ' + ok + ' tasks → ' + (root ? root + '/' : '') + state.tag + '/ tree');
     }
   } catch (e) {
     toast('Push failed: ' + e.message);
@@ -1108,7 +1118,13 @@ $('#file-filter').addEventListener('input', e => { state.filter = e.target.value
 $('#btn-copy-paths').addEventListener('click', () => copyText(selectedFiles().map(f => f.path).join('\n'), 'Paths copied'));
 $('#btn-copy-urls').addEventListener('click', () => copyText(selectedFiles().map(f => f.url).join('\n'), 'URLs copied'));
 $('#btn-curl').addEventListener('click', () => copyText(curlScript(selectedFiles()), 'curl script copied'));
-$('#btn-aria2-push').addEventListener('click', () => aria2Push(selectedFiles()));
+$('#btn-aria2-push').addEventListener('click', () => {
+  const files = selectedFiles();
+  if (state.localServer) // 与 Download All 一致: 先弹窗选择目标目录(绝对路径)
+    browsePick(state.dlDir || '~', p => aria2Push(files, p));
+  else // 静态模式拿不到系统绝对路径, 推到 aria2 自身下载根
+    aria2Push(files);
+});
 // RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
 const envReady = (async () => { // 环境检测: 本地 serve.py(全功能) / 纯静态(GitHub Pages, 降级)
   let local = false;
@@ -1215,14 +1231,20 @@ async function browseLoad(p) {
     toast('Browse failed: ' + e.message);
   }
 }
+let dlmOnPick = null;
+function browsePick(start, onPick) { // 通用目录选择弹窗: Choose 时回调绝对路径
+  dlmOnPick = onPick;
+  $('#dlmodal').hidden = false;
+  browseLoad(start || '~');
+}
 function dlmChoose(p) {
   $('#dlmodal').hidden = true;
-  saveDlDir(p);
+  const cb = dlmOnPick;
+  dlmOnPick = null;
+  if (cb) cb(p);
 }
-$('#btn-dl-dir').addEventListener('click', () => {
-  $('#dlmodal').hidden = false;
-  browseLoad(state.dlDir || '~');
-});
+$('#btn-dl-dir').addEventListener('click',
+  () => browsePick(state.dlDir || '~', p => { $('#dl-dir').value = p; saveDlDir(p); }));
 $('#dlm-ok').addEventListener('click', () => { if (dlmCurrent) dlmChoose(dlmCurrent); });
 const dlmClose = () => { $('#dlmodal').hidden = true; };
 $('#dlm-close').addEventListener('click', dlmClose);

@@ -60,10 +60,10 @@ body.static #row-save-to,body.static #row-parallel{display:none}
 .dlm-item:hover{background:var(--chip)}
 .dlm-foot{display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--line)}
 .cfg-ind .btn{padding:8px 14px;white-space:nowrap;flex:none}
-#btn-src,#btn-aria2-connect{min-width:86px}
-.stat{font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
-.stat.ok{background:#8dc215;color:#fff}
-.stat.err{background:#fdecec;color:#c0392b}
+.stat{font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px;
+       border:1px solid transparent;white-space:nowrap;line-height:1.3}
+.stat.ok{color:#2c7a1f;background:#eef7e6;border-color:#c8dfa8}
+.stat.err{color:#c0392b;background:#fdecec;border-color:#f0c4bd}
 #dl-conc{border:1px solid var(--line);border-radius:8px;padding:7px 6px;font-size:12px;
          background:#fff;color:var(--ink);cursor:pointer}
 
@@ -212,7 +212,6 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
     </div>
     <div class="cfg-row cfg-ind">
       <input id="src-input" type="url" spellcheck="false" placeholder="data.json URL">
-      <button id="btn-src" class="btn lgreen">Update</button>
     </div>
     <div class="cfg-row cfg-sep" id="row-save-to"><span class="cfg-k">Save to</span>
       <span class="cfg-v">
@@ -226,7 +225,6 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
     <div class="cfg-row cfg-ind">
       <input id="aria2-url" type="url" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
       <input id="aria2-token" type="password" placeholder="RPC secret" autocomplete="off">
-      <button id="btn-aria2-connect" class="btn lgreen">Connect</button>
     </div>
     <div class="cfg-row cfg-sep" id="row-parallel"><span class="cfg-k">Parallel</span>
       <span class="cfg-v">
@@ -1081,8 +1079,9 @@ async function loadData(refresh) {
   }
 }
 
-$('#btn-src').addEventListener('click', async () => {
+const applySource = async () => { // 回车/失焦即应用(原 Update 按钮逻辑)
   const v = $('#src-input').value.trim();
+  if (!v || v === state.url) return;
   if (!/^https?:\/\//i.test(v)) { toast('Data source must be an http(s) URL'); return; }
   state.url = v;
   const u = new URL(location);
@@ -1090,8 +1089,9 @@ $('#btn-src').addEventListener('click', async () => {
   history.replaceState(null, '', u); // 地址栏固化 ?url=, 不整页跳转
   toast('Fetching latest data…');
   if (await loadData(true)) toast('Data refreshed · ' + fmtDate(state.meta.fetched_at));
-});
-$('#src-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btn-src').click(); });
+};
+$('#src-input').addEventListener('keydown', e => { if (e.key === 'Enter') applySource(); });
+$('#src-input').addEventListener('change', applySource);
 $('#type-all').addEventListener('click', () => {
   typeRows(manifest().files || {}, state.board).forEach(r => state.checked.add(r.key));
   renderTypes(); renderFiles();
@@ -1102,7 +1102,6 @@ $('#btn-copy-paths').addEventListener('click', () => copyText(selectedFiles().ma
 $('#btn-copy-urls').addEventListener('click', () => copyText(selectedFiles().map(f => f.url).join('\n'), 'URLs copied'));
 $('#btn-curl').addEventListener('click', () => copyText(curlScript(selectedFiles()), 'curl script copied'));
 $('#btn-aria2-push').addEventListener('click', () => aria2Push(selectedFiles()));
-$('#btn-aria2-connect').addEventListener('click', () => aria2Check());
 // RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
 $('#aria2-url').value = localStorage.getItem('aria2-url') || '';
 $('#aria2-token').value = localStorage.getItem('aria2-token') || '';

@@ -71,9 +71,9 @@ body:not(.has-aria2) #btn-aria2-push{display:none}
          background:#fff;color:var(--ink);cursor:pointer}
 
 /* ---- slot 单选 ---- */
-.pills{display:flex;flex-wrap:wrap;gap:10px}
+.pills{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .pill{border:1.5px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;
-      background:#fff;min-width:240px;display:flex;gap:10px;align-items:flex-start}
+      background:#fff;display:flex;gap:10px;align-items:flex-start}
 .pill:hover{border-color:#c8cdd6}
 .pill:has(input:checked){border-color:var(--accent);background:#fff8f3;
                          box-shadow:0 0 0 3px var(--accent-soft)}
@@ -87,7 +87,7 @@ body:not(.has-aria2) #btn-aria2-push{display:none}
 .slottag.prev{color:#b9cdd4;border-color:rgba(185,205,212,.45);background:rgba(185,205,212,.08)}
 
 /* ---- board 单选卡片 ---- */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .cardpick{border:1.5px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;
           background:#fff;display:flex;gap:10px;align-items:flex-start}
 .cardpick:hover{border-color:#c8cdd6}
@@ -120,7 +120,7 @@ body:not(.has-aria2) #btn-aria2-push{display:none}
 .secgroup.secure{border-color:rgba(217,58,58,.35);background:rgba(217,58,58,.025)}
 .secgroup.secure .glabel{background:#c0392b}
 .modeboxes{display:grid;grid-template-columns:1fr 1fr .78fr;gap:10px;align-items:stretch}
-@media (max-width:900px){.modeboxes{grid-template-columns:1fr}}
+@media (max-width:900px){.modeboxes,.pills,.cards{grid-template-columns:1fr}}
 .modebox{border:1px solid #c5d2da;border-radius:10px;padding:0 10px 6px}
 .modebox h3{font-size:13px;font-weight:700;color:#03353f;margin:0 -10px 8px;
              padding:8px 14px 7px;background:rgba(3,53,63,.05);border-bottom:1px solid #c5d2da;
@@ -548,7 +548,7 @@ function renderTypes() {
         h3.addEventListener('click', () => toggleRows(crows));
         h3.append(triInput(crows),
                   el('span', null, CAT_LABEL[cat]),
-                  el('span', 'boxsub', ' - maskrom / SPI flash'),
+                  
                   el('span', 'gc', nSel(crows) + '/' + crows.length));
         mb.append(h3);
         const lrows = el('div', 'lrows');

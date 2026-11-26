@@ -47,6 +47,10 @@ body:not(.has-aria2) #btn-aria2-push{display:none}
 #dl-dir{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
         border-radius:8px;padding:8px 10px;color:var(--ink)}
 #btn-dl-dir{min-width:86px;padding:8px 14px;white-space:nowrap;flex:none}
+/* ---- 路径输入弹窗 ---- */
+#dlpath{position:fixed;inset:0;z-index:40;background:rgba(23,29,43,.45);
+        display:flex;align-items:center;justify-content:center}
+#dlpath[hidden]{display:none}
 /* ---- 目录选择弹窗 ---- */
 #dlmodal{position:fixed;inset:0;z-index:40;background:rgba(23,29,43,.45);
          display:flex;align-items:center;justify-content:center}
@@ -288,6 +292,19 @@ else document.body.className = 'static';
   <button id="btn-download" class="btn primary" disabled>Web Download</button>
 </div>
 
+<div id="dlpath" hidden>
+  <div class="dlm-card">
+    <div class="dlm-head">Download folder<button id="dlp-close" class="btn">✕</button></div>
+    <div class="dlm-path" style="padding:10px 14px">
+      <input id="dlp-input" type="text" spellcheck="false" style="width:100%;font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink)">
+    </div>
+    <div class="dlm-foot">
+      <button id="dlp-cancel" class="btn">Cancel</button>
+      <button id="dlp-ok" class="btn lgreen">OK</button>
+    </div>
+  </div>
+</div>
+
 <div id="dlmodal" hidden>
   <div class="dlm-card">
     <div class="dlm-head">Select download folder<button id="dlm-close" class="btn">✕</button></div>
@@ -325,7 +342,7 @@ const LOADER_LABEL = {maskrom: 'Maskrom', spi: 'SPI Flash'};
 const state = {
   url: null, meta: null, data: null,
   tag: null, board: null, checked: new Set(), filter: '',
-  dlRoot: null, dlAbort: null, // 结构化下载: 已选目录句柄 / 进行中任务的取消器
+  dlAbort: null, // 进行中下载任务的取消器
   dlConc: 2, // 同时下载的文件数
   aria2Det: null, // /api/aria2 检测结果(配置文件提取的 RPC/密钥/下载根)
   dlMode: null, dlDir: null, // 下载模式(server=服务端任务) / 服务端配置的下载根
@@ -802,15 +819,8 @@ function safeSeg(s) { // 路径段清洗: 防路径穿越
   return s.replace(/[\/\\\0]/g, '_').replace(/^\.+$/, '_') || '_';
 }
 
-async function pickRootDir() {
-  // 同一会话内复用已选目录; 权限被吊销时重新请求(需在用户手势内)
-  if (state.dlRoot) {
-    if (await state.dlRoot.queryPermission({mode: 'readwrite'}) === 'granted') return state.dlRoot;
-    if (await state.dlRoot.requestPermission({mode: 'readwrite'}) === 'granted') return state.dlRoot;
-    state.dlRoot = null;
-  }
-  state.dlRoot = await window.showDirectoryPicker({mode: 'readwrite'});
-  return state.dlRoot;
+async function pickRootDir() { // 每次都弹系统目录选择器(不做记忆)
+  return await window.showDirectoryPicker({mode: 'readwrite'});
 }
 
 async function writeFileBody(fh, resp, from, onChunk) {
@@ -955,9 +965,9 @@ async function downloadStructured(files, direct) {
 
 /* ---------- 服务端下载: 按 Setup 配置的 Save to 目录落盘, 目录树 <dir>/<tag>/<board>/<sec>/<cat>/[ota/]<file> ---------- */
 
-async function downloadServer(files) {
+async function downloadServer(files, base) {
   const body = JSON.stringify({
-    conc: state.dlConc || 2,
+    conc: state.dlConc || 2, base: base || undefined,
     files: files.map(f => ({dest: state.tag + '/' + f.path, url: f.url, size: f.size || 0})),
   });
   let resp, j;
@@ -1035,11 +1045,11 @@ async function pollServerJob(base) { // 轮询 /api/job 直到结束; base 用�
 }
 
 async function downloadAll(files) {
-  if (state.localServer) { // 首选: 服务端按 Save to 配置落盘(依赖 serve.py)
-    try {
-      await downloadServer(files);
-      return;
-    } catch (e) { /* 无 /api/download(旧服务端) → 回退浏览器模式 */ }
+  if (state.localServer) { // 每次弹服务端目录浏览选择落盘位置(Save to 为起始目录)
+    browsePick(state.dlDir || '~', p => {
+      downloadServer(files, p).catch(e => console.warn('server download failed:', e));
+    });
+    return;
   }
   if (window.showDirectoryPicker) {
     // 浏览器目录树下载 <tag>/<board>/<variant>/<cat>/[ota/]<file>;
@@ -1128,12 +1138,17 @@ $('#file-filter').addEventListener('input', e => { state.filter = e.target.value
 $('#btn-copy-paths').addEventListener('click', () => copyText(selectedFiles().map(f => f.path).join('\n'), 'Paths copied'));
 $('#btn-copy-urls').addEventListener('click', () => copyText(selectedFiles().map(f => f.url).join('\n'), 'URLs copied'));
 $('#btn-curl').addEventListener('click', () => copyText(curlScript(selectedFiles()), 'curl script copied'));
-$('#btn-aria2-push').addEventListener('click', () => {
+$('#btn-aria2-push').addEventListener('click', async () => {
   const files = selectedFiles();
-  if (state.localServer) // 与 Download All 一致: 先弹窗选择目标目录(绝对路径)
+  if (state.localServer) { // 本地: 弹服务端目录浏览
     browsePick(state.dlDir || '~', p => aria2Push(files, p));
-  else // 静态模式拿不到系统绝对路径, 推到 aria2 自身下载根
-    aria2Push(files);
+    return;
+  }
+  // 静态: 系统选择器给不了绝对路径 → 路径输入框, 预填 aria2 下载根 + tag
+  const root = await aria2GlobalDir($('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc',
+                                    $('#aria2-token').value.trim());
+  pathPrompt((root ? root.replace(/\/+$/, '') + '/' : '') + state.tag,
+             p => p && aria2Push(files, p));
 });
 // RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
 const envReady = (async () => { // 环境检测: 本地 serve.py(全功能) / 纯静态(GitHub Pages, 降级)
@@ -1240,6 +1255,16 @@ async function browseLoad(p) {
   } catch (e) {
     toast('Browse failed: ' + e.message);
   }
+}
+function pathPrompt(prefill, onOk) { // 路径输入弹窗(静态模式 Push 用)
+  const box = $('#dlpath');
+  $('#dlp-input').value = prefill || '';
+  box.hidden = false;
+  const done = ok => { box.hidden = true; if (ok) onOk($('#dlp-input').value.trim()); };
+  $('#dlp-ok').onclick = () => done(true);
+  $('#dlp-cancel').onclick = $('#dlp-close').onclick = () => done(false);
+  $('#dlp-input').onkeydown = e => { if (e.key === 'Enter') done(true); };
+  $('#dlp-input').focus();
 }
 let dlmOnPick = null;
 function browsePick(start, onPick) { // 通用目录选择弹窗: Choose 时回调绝对路径

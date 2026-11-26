@@ -1114,8 +1114,13 @@ fetch('/api/aria2').then(r => r.json()).then(det => {
   }
   aria2Check();
 }).catch(() => { aria2Check(); });
-$('#aria2-url').addEventListener('change', aria2Check);
-$('#aria2-token').addEventListener('change', aria2Check);
+// aria2 RPC 地址与密钥: 改动即存 localStorage(跨会话记忆), 手动输入优先于配置文件自动检测
+const aria2Persist = () => {
+  localStorage.setItem('aria2-url', $('#aria2-url').value.trim());
+  localStorage.setItem('aria2-token', $('#aria2-token').value.trim());
+};
+$('#aria2-url').addEventListener('change', () => { aria2Persist(); aria2Check(); });
+$('#aria2-token').addEventListener('change', () => { aria2Persist(); aria2Check(); });
 $('#btn-export').addEventListener('click', () => exportJson(selectedFiles()));
 $('#btn-download').addEventListener('click', () => downloadAll(selectedFiles()));
 $('#dlp-cancel').addEventListener('click', () => {

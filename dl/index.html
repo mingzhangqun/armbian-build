@@ -306,7 +306,7 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 
 <script>
 'use strict';
-const DEFAULT_URL = 'https://seeed-studio.github.io/armbian-build/'; // 请求时自动拼接 data.json
+const DEFAULT_URL = 'https://mingzhangqun.github.io/armbian-build/'; // 自家镜像; 请求时自动拼接 data.json
 const SLOT_ORDER = ['stable', 'pre-release', 'history'];
 const CAT_ORDER = ['recovery', 'ab', 'loaders'];
 const CAT_LABEL = {recovery: 'Recovery', ab: 'A/B', loaders: 'Loader'};
@@ -1206,7 +1206,7 @@ state.dlConc = +concSel.value || 2;
   state.localServer = local;
   document.body.classList.toggle('static', !local);
   const q = new URLSearchParams(location.search).get('url');
-  state.url = q || (local ? DEFAULT_URL : new URL('../data.json', location.href).href);
+  state.url = q || DEFAULT_URL; // 两种模式统一默认自家镜像基址
   loadData();
 })();
 </script>

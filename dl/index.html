@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Armbian Image Downloader</title>
 <style>
-:root{
+:root{--cfg-input-w:640px;
+        
   --bg:#f4f5f7; --card:#fff; --ink:#1c2333; --muted:#6b7280; --line:#e5e7eb;
   --accent:#e0662a; --accent-soft:rgba(224,102,42,.10);
   --chip:#eef1f6; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -39,12 +40,13 @@ body.aria2-on #btn-aria2-push{display:inline-block}
 .cfg-time{font-size:12px;color:var(--muted)}
 .cfg-sep{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
 .cfg-ind{padding-left:64px}
-.cfg-ind input{flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
+/* 复用输入框组件: 所有 Setup editbox 同宽同风格 */
+.cfg-input{font-family:var(--mono);font-size:12px;border:1px solid var(--line);
+           border-radius:8px;padding:8px 10px;color:var(--ink);width:var(--cfg-input-w);box-sizing:border-box}
+.cfg-input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.cfg-ind input:not(.cfg-input){flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
                border-radius:8px;padding:8px 10px;color:var(--ink)}
-.cfg-ind input:focus,#dl-root:focus,#dl-dir:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
-#src-input,#dl-root{font-family:var(--mono)}
-#dl-dir,#dl-root{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
-        border-radius:8px;padding:8px 10px;color:var(--ink)}
+.cfg-ind input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 #btn-dl-dir{min-width:86px;padding:8px 14px;white-space:nowrap;flex:none}
 /* ---- 目录选择弹窗 ---- */
 #dlmodal{position:fixed;inset:0;z-index:40;background:rgba(23,29,43,.45);
@@ -66,6 +68,7 @@ body.aria2-on #btn-aria2-push{display:inline-block}
        border:1px solid transparent;white-space:nowrap;line-height:1.3}
 .stat.ok{color:#2c7a1f;background:#eef7e6;border-color:#c8dfa8}
 .stat.err{color:#c0392b;background:#fdecec;border-color:#f0c4bd}
+.conc span{font-size:12px;color:var(--ink)} /* 与 All/None 按钮文字风格一致 */
 #dl-conc{border:1px solid var(--line);border-radius:8px;padding:7px 6px;font-size:12px;
          background:#fff;color:var(--ink);cursor:pointer}
 
@@ -229,7 +232,7 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
   <section class="card">
     <h2><i class="step">1</i>Setup</h2>
     <div class="cfg-row"><span class="cfg-k">Download</span>
-      <span class="cfg-v"><input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
+      <span class="cfg-v"><input id="dl-root" class="cfg-input" type="text" spellcheck="false" placeholder="~/Downloads">
         <span class="cfg-time" id="dl-root-stat"></span></span>
     </div>
     <div class="cfg-row cfg-sep"><span class="cfg-k">Source</span>
@@ -237,11 +240,11 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
         <span class="cfg-time" id="refresh-time"></span></span>
     </div>
     <div class="cfg-row cfg-ind">
-      <input id="src-input" type="url" spellcheck="false" placeholder="data.json URL">
+      <input id="src-input" class="cfg-input" type="url" spellcheck="false" placeholder="data.json URL">
     </div>
     <div class="cfg-row cfg-sep" id="row-save-to"><span class="cfg-k">Save to</span>
       <span class="cfg-v">
-        <input id="dl-dir" type="text" spellcheck="false" placeholder="~/Downloads">
+        <input id="dl-dir" class="cfg-input" type="text" spellcheck="false" placeholder="~/Downloads">
         <button id="btn-dl-dir" class="btn lgreen">Select</button>
       </span>
     </div>
@@ -249,8 +252,8 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
       <span class="cfg-v"><span class="stat err" id="aria2-stat">Disconnected</span></span>
     </div>
     <div class="cfg-row cfg-ind" id="row-aria2-in">
-      <input id="aria2-url" type="url" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
-      <input id="aria2-token" type="password" placeholder="RPC secret" autocomplete="off">
+      <input id="aria2-url" class="cfg-input" style="width:auto;flex:2" type="url" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
+      <input id="aria2-token" class="cfg-input" style="width:auto;flex:1" type="password" placeholder="RPC secret" autocomplete="off">
     </div>
   </section>
 
@@ -304,6 +307,7 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
           <option value="8">8</option>
         </select>
       </label>
+      <button id="dl-clear" class="btn">Clear</button>
     </h2>
     <div id="dl-tasks"><div class="dl-empty">No download tasks</div></div>
   </section>
@@ -1632,6 +1636,10 @@ dlTaskRestore();
 setInterval(() => { // aria2 健康巡检: 状态变化时通知
   if ($('#aria2-url').value.trim()) aria2Check();
 }, 30000);
+$('#dl-clear').addEventListener('click', async () => { // 清空任务列表(同逐个 ✕ 语义)
+  for (const t of [...state.dlTasks]) await dlTaskRemove(t);
+});
+
 const concSel = $('#dl-conc');
 concSel.value = localStorage.getItem('dl-conc') || '2';
 concSel.addEventListener('change', () => {

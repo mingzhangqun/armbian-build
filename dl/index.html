@@ -230,7 +230,7 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
     <h2><i class="step">1</i>Setup</h2>
     <div class="cfg-row"><span class="cfg-k">Download</span>
       <span class="cfg-v">
-        <input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
+        <input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads/armbian">
       </span>
     </div>
     <div class="cfg-row cfg-sep"><span class="cfg-k">Source</span>
@@ -242,7 +242,7 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
     </div>
     <div class="cfg-row cfg-sep" id="row-save-to"><span class="cfg-k">Save to</span>
       <span class="cfg-v">
-        <input id="dl-dir" type="text" spellcheck="false" placeholder="~/Downloads">
+        <input id="dl-dir" type="text" spellcheck="false" placeholder="~/Downloads/armbian">
         <button id="btn-dl-dir" class="btn lgreen">Select</button>
       </span>
     </div>
@@ -335,7 +335,6 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
 
 <script>
 'use strict';
-const DL_SUB = 'armbian-imgs'; // 所有下载方式统一的二级目录: <root>/armbian-imgs/<tag>/…
 const DEFAULT_URL = 'https://mingzhangqun.github.io/armbian-build/'; // 自家镜像; 请求时自动拼接 data.json
 const SLOT_ORDER = ['stable', 'pre-release', 'history'];
 const CAT_ORDER = ['recovery', 'ab', 'loaders'];
@@ -706,11 +705,11 @@ function curlScript(files) {
   files.forEach(f => lines.push("curl -fL --retry 3 -C - -o '" + tag + '/' + f.path + "' '" + f.url + "'"));
   return lines.join('\n');
 }
-function aria2Entries(files, base) { // 目录树: base + armbian-imgs/tag/板卡/变体/类目/[ota/]
+function aria2Entries(files, base) { // 目录树: base + tag/板卡/变体/类目/[ota/]
   const tag = state.tag;
   return files.map(f => {
     const segs = f.path.split('/');
-    return {url: f.url, dir: base + DL_SUB + '/' + tag + '/' + segs.slice(0, -1).join('/'),
+    return {url: f.url, dir: base + tag + '/' + segs.slice(0, -1).join('/'),
             out: segs[segs.length - 1]};
   });
 }
@@ -773,7 +772,7 @@ function dlTaskAddAria2(files, gids) { // 登记到 Downloads 列表: 防重复�
   const box = $('#dl-tasks');
   if (box.querySelector('.dl-empty')) box.textContent = '';
   files.forEach((f, i) => {
-    const segs = [DL_SUB, state.tag, ...f.path.split('/').map(safeSeg)];
+    const segs = [state.tag, ...f.path.split('/').map(safeSeg)];
     const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
                expected: f.size || 0, root: null, status: 'aria2', gid: gids && gids[i],
                got: 0, total: f.size || 0, speed: 0, spT: 0, spB: 0};
@@ -1166,7 +1165,7 @@ function dlPump(direct) { // 动态并发调度: 按标题栏 Parallel 值补位
 async function downloadStructured(files, direct) {
   const tag = state.tag;
   const root = await pickRootDir();
-  try { await root.getDirectoryHandle(DL_SUB, {create: true}); } // 探测: 句柄指向的目录已不存在时提前失败
+  try { await root.getDirectoryHandle(tag, {create: true}); } // 探测: 句柄指向的目录已不存在时提前失败
   catch (e) {
     state.dlRootHandle = null;
     try { await idbKv('readwrite', 'dlRoot', null); } catch (e2) {}
@@ -1175,7 +1174,7 @@ async function downloadStructured(files, direct) {
   $('#dl-tasks').querySelector('.dl-empty') && ($('#dl-tasks').textContent = '');
   let added = 0;
   for (const f of files) {
-    const segs = [DL_SUB, tag, ...f.path.split('/').map(safeSeg)];
+    const segs = [tag, ...f.path.split('/').map(safeSeg)];
     const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
                expected: f.size || 0, root, status: 'queued', direct: !!direct,
                got: 0, total: f.size || 0, speed: 0, spT: 0, spB: 0};
@@ -1195,7 +1194,7 @@ async function downloadStructured(files, direct) {
 async function downloadServer(files, base) {
   const body = JSON.stringify({
     conc: state.dlConc || 2, base: base || undefined,
-    files: files.map(f => ({dest: DL_SUB + '/' + state.tag + '/' + f.path, url: f.url, size: f.size || 0})),
+    files: files.map(f => ({dest: state.tag + '/' + f.path, url: f.url, size: f.size || 0})),
   });
   let resp, j;
   try {
@@ -1277,7 +1276,7 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
   state.dlMode = 'server'; // 巡检让路, 不再重复打开 Downloading 浮窗
   const fin = () => { state.dlMode = null; };
   const tasks = reuse || files.map(f => {
-    const segs = [DL_SUB, state.tag, ...f.path.split('/').map(safeSeg)];
+    const segs = [state.tag, ...f.path.split('/').map(safeSeg)];
     const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
                expected: f.size || 0, root: null, status: 'active',
                got: 0, total: f.size || 0, speed: 0, spT: Date.now(), spB: 0};
@@ -1292,7 +1291,7 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
     const resp = await fetch('/api/download', {method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({conc: state.dlConc || 2,
-        files: files.map(f => ({dest: DL_SUB + '/' + state.tag + '/' + f.path, url: f.url, size: f.size || 0}))})});
+        files: files.map(f => ({dest: state.tag + '/' + f.path, url: f.url, size: f.size || 0}))})});
     const j = await resp.json();
     if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
     base = j.base || '';
@@ -1303,7 +1302,7 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
     fin();
     return;
   }
-  const byDest = new Map(tasks.map(t => [DL_SUB + '/' + state.tag + '/' + t.name, t]));
+  const byDest = new Map(tasks.map(t => [state.tag + '/' + t.name, t]));
   (async () => { // 轮询 /api/job, 映射到任务行
     while (true) {
       await new Promise(r => setTimeout(r, 600));
@@ -1318,7 +1317,7 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
         for (const t of tasks) {
           if (t.status !== 'active') continue;
           if (job.status === 'cancelled') t.status = 'cancelled';
-          else if (errNames.has(DL_SUB + '/' + state.tag + '/' + t.name)) { t.status = 'error'; t.err = 'failed'; }
+          else if (errNames.has(state.tag + '/' + t.name)) { t.status = 'error'; t.err = 'failed'; }
           else { t.status = 'done'; if (job.skipped && !t.got) t.note = 'skipped (already complete)'; }
           dlTaskPaint(t);
         }
@@ -1353,7 +1352,7 @@ async function downloadAll(files, _retry) { // Add to Downloads: 直接入列, �
         return downloadAll(files, true);
       }
       if (e && e.name === 'AbortError') { // 仅首次选择时取消; Chrome 拒绝系统目录时也会走到这
-        toast('Tip: don\u2019t select Downloads itself — open it and select the “armbian-imgs” subfolder (create it if missing)');
+        toast('Tip: don\u2019t select Downloads itself — open it and select the “armbian” subfolder (create it if missing)');
         return;
       }
       console.warn('structured download failed, falling back:', e);
@@ -1536,7 +1535,9 @@ async function saveDlDir(v) {
 }
 $('#dl-dir').addEventListener('keydown', e => { if (e.key === 'Enter') saveDlDir($('#dl-dir').value.trim()); });
 // Download 地址(下载根偏好): localStorage 持久化, 静态 Push 预填优先使用
-$('#dl-root').value = localStorage.getItem('dl-root') || '~/Downloads';
+{ const v = localStorage.getItem('dl-root');
+   if (!v || v === '~/Downloads') localStorage.setItem('dl-root', '~/Downloads/armbian'); }
+$('#dl-root').value = localStorage.getItem('dl-root') || '~/Downloads/armbian';
 $('#dl-root').addEventListener('change', () => {
   localStorage.setItem('dl-root', $('#dl-root').value.trim());
 });

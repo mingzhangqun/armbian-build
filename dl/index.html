@@ -20,7 +20,7 @@ button{font:inherit}
         display:flex;align-items:center;gap:16px;padding:10px 20px;flex-wrap:wrap}
 #topbar .brand{font-weight:700;font-size:16px;white-space:nowrap}
 
-main{max-width:940px;margin:0 auto;padding:16px 20px 90px}
+main{max-width:940px;margin:0 auto;padding:16px 20px 40px}
 section.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
              padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
 h2{display:flex;align-items:center;gap:10px;font-size:15px;margin:0 0 14px}
@@ -32,10 +32,8 @@ h2 .spacer{margin-left:auto}
 /* ---- 数据源 ---- */
 .cfg-row{display:flex;align-items:center;gap:6px;margin-top:9px}
 body.static #row-save-to{display:none}
-#row-aria2,#row-aria2-in{display:none}
-body.has-aria2 #row-aria2,body.has-aria2 #row-aria2-in{display:flex}
 #btn-aria2-push{display:none}
-body.has-aria2.aria2-on #btn-aria2-push{display:inline-block}
+body.aria2-on #btn-aria2-push{display:inline-block}
 .cfg-k{width:58px;flex:none;font-size:13px;font-weight:600}
 .cfg-v{display:flex;align-items:center;gap:6px;min-width:0;flex:1;flex-wrap:wrap}
 .cfg-time{font-size:12px;color:var(--muted)}
@@ -45,7 +43,7 @@ body.has-aria2.aria2-on #btn-aria2-push{display:inline-block}
                border-radius:8px;padding:8px 10px;color:var(--ink)}
 .cfg-ind input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 #src-input{font-family:var(--mono)}
-#dl-dir{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
+#dl-dir,#dl-root{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
         border-radius:8px;padding:8px 10px;color:var(--ink)}
 #btn-dl-dir{min-width:86px;padding:8px 14px;white-space:nowrap;flex:none}
 /* ---- 路径输入弹窗 ---- */
@@ -171,16 +169,15 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 
 /* ---- 底部操作栏 / 提示 ---- */
-#actionbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;
-           border-top:1px solid var(--line);box-shadow:0 -4px 14px rgba(16,24,40,.06);
-           padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-#actionbar .sum{margin-right:auto;color:var(--muted);font-size:13px}
-#actionbar .sum b{color:var(--ink)}
+.sel-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;
+               border-top:1px solid var(--line);padding-top:12px}
+.sel-actions .sum{margin-right:auto;color:var(--muted);font-size:13px}
+.sel-actions .sum b{color:var(--ink)}
 #toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:30;
        background:#171d2b;color:#fff;border-radius:99px;padding:9px 18px;font-size:13px;
        box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw}
 /* ---- 结构化下载进度面板 ---- */
-#dlpanel{position:fixed;right:16px;bottom:70px;z-index:25;width:380px;max-width:calc(100vw - 32px);
+#dlpanel{position:fixed;right:16px;bottom:16px;z-index:25;width:380px;max-width:calc(100vw - 32px);
          background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
          box-shadow:0 8px 28px rgba(16,24,40,.14)}
 .dlp-head{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;margin-bottom:10px}
@@ -225,8 +222,7 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 </head>
 <body>
 <script>/* 首帧同步预判模式: 非 localhost 先按静态(隐藏 Save to/Parallel), 避免刷新闪烁; 异步检测后再纠正 */
-if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body.classList.add('has-aria2');
-else document.body.className = 'static';
+if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body.className = 'static';
 </script>
 
 <header id="topbar">
@@ -238,6 +234,11 @@ else document.body.className = 'static';
 
   <section class="card">
     <h2><i class="step">1</i>Setup</h2>
+    <div class="cfg-row"><span class="cfg-k">Download</span>
+      <span class="cfg-v">
+        <input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
+      </span>
+    </div>
     <div class="cfg-row"><span class="cfg-k">Source</span>
       <span class="cfg-v"><span class="stat err" id="src-stat">Failed</span>
         <span class="cfg-time" id="refresh-time"></span></span>
@@ -285,6 +286,15 @@ else document.body.className = 'static';
       <input id="file-filter" type="search" placeholder="Filter filenames…">
     </h2>
     <div id="files-wrap"><div class="empty">-</div></div>
+    <div class="sel-actions">
+      <span class="sum" id="sum">Nothing selected</span>
+      <button id="btn-copy-paths" class="btn" disabled>Copy Paths</button>
+      <button id="btn-copy-urls" class="btn" disabled>Copy URLs</button>
+      <button id="btn-curl" class="btn" disabled>Copy curl Script</button>
+      <button id="btn-export" class="btn" disabled>Export JSON</button>
+      <button id="btn-aria2-push" class="btn green" disabled>Push to aria2</button>
+      <button id="btn-download" class="btn primary" disabled>Add to Downloads</button>
+    </div>
   </section>
   <section class="card" id="dl-list-card">
     <h2><i class="step">6</i>Downloads <span class="sub" id="dl-summary"></span>
@@ -307,16 +317,6 @@ else document.body.className = 'static';
   </section>
 
 </main>
-
-<div id="actionbar">
-  <span class="sum" id="sum">Nothing selected</span>
-  <button id="btn-copy-paths" class="btn" disabled>Copy Paths</button>
-  <button id="btn-copy-urls" class="btn" disabled>Copy URLs</button>
-  <button id="btn-curl" class="btn" disabled>Copy curl Script</button>
-  <button id="btn-export" class="btn" disabled>Export JSON</button>
-  <button id="btn-aria2-push" class="btn green" disabled>Push to aria2</button>
-  <button id="btn-download" class="btn primary" disabled>Web Download</button>
-</div>
 
 <div id="dlpath" hidden>
   <div class="dlm-card">
@@ -1296,9 +1296,10 @@ $('#btn-aria2-push').addEventListener('click', async () => {
     return;
   }
   // 静态: 系统选择器给不了绝对路径 → 路径输入框, 预填 aria2 下载根 + tag
-  const root = await aria2GlobalDir($('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc',
-                                    $('#aria2-token').value.trim());
-  pathPrompt((root ? root.replace(/\/+$/, '') + '/' : '') + state.tag,
+  const pref = $('#dl-root').value.trim().replace(/\/+$/, '');
+  const root = pref || await aria2GlobalDir($('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc',
+                                            $('#aria2-token').value.trim());
+  pathPrompt(((pref || root) ? (pref || root).replace(/\/+$/, '') + '/' : '') + state.tag,
              p => p && aria2Push(files, p));
 });
 // RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
@@ -1323,32 +1324,26 @@ const envReady = (async () => { // 环境检测: 本地 serve.py(全功能) / �
   if (state.localServer) {
     let det = null;
     try { det = await (await fetch('/api/aria2')).json(); } catch (e) {}
-    document.body.classList.toggle('has-aria2', !!(det && det.installed)); // 修正首帧乐观显示
-    if (det && det.installed) {
-      state.aria2Det = det;
-      if (det.endpoint) fill(det.endpoint, det.token);          // 配置文件优先
-      else fill(localStorage.getItem('aria2-url') || '', localStorage.getItem('aria2-token') || ''); // 无 RPC 配置 → 回退
-      aria2Check();
-    } // 未安装 aria2 → 保持隐藏
+    if (det) state.aria2Det = det;
+    if (det && det.endpoint) fill(det.endpoint, det.token); // 配置文件优先
+    else fill(localStorage.getItem('aria2-url') || '', localStorage.getItem('aria2-token') || '');
+    aria2Check(); // 未安装 → Disconnected
   } else {
     const saved = localStorage.getItem('aria2-url') || '';
     fill(saved, localStorage.getItem('aria2-token') || '');
     const probe = saved || 'http://127.0.0.1:6800/jsonrpc';
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 2000);
-    let present = false;
-    try {
-      await fetch(probe, {method: 'POST', signal: ctrl.signal,
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: 'aria2.getVersion', params: []})});
-      present = true; // 任何 HTTP 响应(含 401/400)都说明 aria2 在监听
-    } catch (e) { present = false; } // 连接被拒/超时 → 未安装
-    clearTimeout(timer);
-    if (present || saved) {
-      document.body.classList.add('has-aria2');
-      if (!saved) fill(probe, null); // 探测到默认端口 → 填地址(密钥留待用户输入)
-      aria2Check();
+    if (!saved) { // 探测默认端口, 在跑则预填地址
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 2000);
+      try {
+        await fetch(probe, {method: 'POST', signal: ctrl.signal,
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: 'aria2.getVersion', params: []})});
+        fill(probe, null);
+      } catch (e) {} // 未运行 → 留空, 显示 Disconnected
+      clearTimeout(timer);
     }
+    aria2Check();
   }
 })();
 // aria2 RPC 地址与密钥: 改动即存 localStorage(跨会话记忆), 手动输入优先于配置文件自动检测
@@ -1385,6 +1380,11 @@ async function saveDlDir(v) {
   }
 }
 $('#dl-dir').addEventListener('keydown', e => { if (e.key === 'Enter') saveDlDir($('#dl-dir').value.trim()); });
+// Download 地址(下载根偏好): localStorage 持久化, 静态 Push 预填优先使用
+$('#dl-root').value = localStorage.getItem('dl-root') || '~/Downloads';
+$('#dl-root').addEventListener('change', () => {
+  localStorage.setItem('dl-root', $('#dl-root').value.trim());
+});
 
 let dlmCurrent = null;
 async function browseLoad(p) {
@@ -1449,7 +1449,6 @@ setInterval(async () => {
 }, 2000);
 dlTaskRestore();
 setInterval(() => { // aria2 健康巡检: 状态变化时通知
-  if (!document.body.classList.contains('has-aria2')) return;
   if ($('#aria2-url').value.trim()) aria2Check();
 }, 30000);
 const dlCard = $('#dl-list-card');

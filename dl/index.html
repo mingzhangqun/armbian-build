@@ -903,7 +903,14 @@ async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权�
   if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
   try { state.dlRootHandle = (await idbKv('readonly', 'dlRoot')) || null; } catch (e) {}
   if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
-  const root = await window.showDirectoryPicker({mode: 'readwrite'});
+  // startIn 只认固定位置或已授权句柄: 优先上次句柄, 其次按 Setup-Download 映射已知目录
+  const WELL = [['downloads', 'downloads'], ['documents', 'documents'], ['desktop', 'desktop'],
+                ['pictures', 'pictures'], ['music', 'music'], ['videos', 'videos']];
+  let startIn = state.dlRootHandle || 'downloads';
+  const dv = ($('#dl-root').value.trim() || '~/Downloads').toLowerCase();
+  for (const [name, token] of WELL)
+    if (dv === '~/' + name || dv.endsWith('/' + name)) { startIn = token; break; }
+  const root = await window.showDirectoryPicker({mode: 'readwrite', startIn});
   state.dlRootHandle = root;
   try { await idbKv('readwrite', 'dlRoot', root); } catch (e) {}
   return root;

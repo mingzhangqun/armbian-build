@@ -929,10 +929,24 @@ async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权�
   }
   state.dlRootHandle = root;
   $('#dl-root-stat').textContent = root.name; // 当前生效的目录名
-  // 回写 Download 路径(浏览器拿不到绝对路径, 以 ~ 拼接所选目录名, 尽力同步)
+  // 回写 Download 路径(浏览器拿不到绝对路径; 以选择器起始目录为锚点推断父级, 尽力同步)
   { const cur = $('#dl-root').value.trim();
     if (cur.startsWith('~') && pickedName) {
-      const nv = '~/' + pickedName + (sub ? '/' + sub : '');
+      const WELLNAME = {downloads: 'Downloads', documents: 'Documents', desktop: 'Desktop',
+                        pictures: 'Pictures', music: 'Music', videos: 'Videos'};
+      const anchor = typeof startIn === 'string' ? (WELLNAME[startIn] || startIn) : null;
+      let nv;
+      if (anchor && pickedName.toLowerCase() === anchor.toLowerCase()) {
+        // 选中的就是起始目录本身: 路径 = <锚点>[/<自动下钻子目录>]
+        nv = '~/' + anchor + (sub ? '/' + sub : '');
+      } else if (anchor) {
+        // 起始目录里进入了子目录: 路径 = <锚点>/<所选子目录>[/<下钻>]
+        nv = '~/' + anchor + '/' + pickedName + (sub ? '/' + sub : '');
+      } else {
+        const segs = cur.replace(/\/+$/, '').split('/');
+        segs[segs.length - 1] = pickedName;
+        nv = segs.join('/') + (sub ? '/' + sub : '');
+      }
       if (nv !== cur) { $('#dl-root').value = nv; localStorage.setItem('dl-root', nv); }
     } }
   try { await idbKv('readwrite', 'dlRoot', root); } catch (e) {}

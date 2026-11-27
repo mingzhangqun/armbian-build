@@ -31,7 +31,7 @@ h2 .spacer{margin-left:auto}
 
 /* ---- 数据源 ---- */
 .cfg-row{display:flex;align-items:center;gap:6px;margin-top:9px}
-body.static #row-save-to,body.static #row-parallel{display:none}
+body.static #row-save-to{display:none}
 #row-aria2,#row-aria2-in{display:none}
 body.has-aria2 #row-aria2,body.has-aria2 #row-aria2-in{display:flex}
 body:not(.has-aria2) #btn-aria2-push{display:none}
@@ -200,6 +200,25 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
            transition:width .15s linear}
 #banner{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;
         padding:12px 14px;margin-bottom:16px}
+/* ---- Downloads 任务列表 ---- */
+#dl-tasks{max-height:340px;overflow:auto}
+.dl-empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+.task{padding:8px 2px 9px}
+.task + .task{border-top:1px solid var(--line)}
+.t-head{display:flex;align-items:center;gap:8px;min-width:0}
+.t-icon{flex:none;width:18px;text-align:center;font-size:13px;color:var(--muted)}
+.task.done .t-icon{color:#1a9e4b;font-weight:700}
+.t-name{flex:1;min-width:0;font-family:var(--mono);font-size:11px;word-break:break-all;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-stat{flex:none;color:var(--muted);font-size:11px;white-space:nowrap}
+.t-x{border:none;background:none;cursor:pointer;color:var(--muted);font-size:12px;
+     padding:2px 5px;border-radius:4px;flex:none}
+.t-x:hover{color:#c0392b;background:#fdecec}
+.t-bar{height:5px;background:var(--chip);border-radius:3px;overflow:hidden;margin-top:5px}
+.t-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px}
+.task.done .t-bar i{background:#1a9e4b}
+#dl-collapse{padding:4px 10px}
+#dl-list-card.collapsed #dl-tasks{display:none}
 .loading{padding:40px;text-align:center;color:var(--muted)}
 </style>
 </head>
@@ -238,20 +257,6 @@ else document.body.className = 'static';
       <input id="aria2-url" type="url" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
       <input id="aria2-token" type="password" placeholder="RPC secret" autocomplete="off">
     </div>
-    <div class="cfg-row cfg-sep" id="row-parallel"><span class="cfg-k">Parallel</span>
-      <span class="cfg-v">
-        <select id="dl-conc" title="Concurrent downloads">
-          <option value="1">1</option>
-          <option value="2" selected>2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
-        </select>
-      </span>
-    </div>
   </section>
 
   <section class="card">
@@ -280,6 +285,26 @@ else document.body.className = 'static';
     </h2>
     <div id="files-wrap"><div class="empty">-</div></div>
   </section>
+  <section class="card" id="dl-list-card">
+    <h2><i class="step">6</i>Downloads <span class="sub" id="dl-summary"></span>
+      <span class="spacer"></span>
+      <label class="conc" title="Concurrent downloads"><span>Parallel</span>
+        <select id="dl-conc">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
+      </label>
+      <button id="dl-collapse" class="btn" title="Collapse">▾</button>
+    </h2>
+    <div id="dl-tasks"><div class="dl-empty">No download tasks</div></div>
+  </section>
+
 </main>
 
 <div id="actionbar">
@@ -854,113 +879,165 @@ function dlPanelShow(tag, total) {
 }
 function dlPanelHide() { $('#dlpanel').hidden = true; }
 
+/* ---------- 浏览器下载任务列表: 常驻面板, 动态并发调度 ---------- */
+
+state.dlTasks = []; // {id, segs, name, url, expected, root, status, got, total, speed, spT, spB, err, fctrl, row:{...}}
+state.dlActive = 0;
+state.dlLastLaunch = 0;
+state.dlSeq = 0;
+state.dlDirect = true;
+
+function dlTaskRender() { // 空态/汇总
+  const box = $('#dl-tasks');
+  if (!state.dlTasks.length && !box.querySelector('.dl-empty'))
+    box.textContent = '', box.append(el('div', 'dl-empty', 'No download tasks'));
+  const done = state.dlTasks.filter(t => t.status === 'done').length;
+  const act = state.dlTasks.filter(t => t.status === 'active').length;
+  $('#dl-summary').textContent = state.dlTasks.length
+    ? act + ' active · ' + done + '/' + state.dlTasks.length + ' done' : '';
+}
+
+function dlTaskRow(t) {
+  const row = el('div', 'task' + (t.status === 'done' ? ' done' : ''));
+  const head = el('div', 't-head');
+  const icon = el('span', 't-icon');
+  const name = el('span', 't-name', t.name);
+  const stat = el('span', 't-stat');
+  const x = el('button', 't-x', '✕');
+  x.title = 'Remove task and delete downloaded file';
+  x.addEventListener('click', () => dlTaskRemove(t));
+  head.append(icon, name, stat, x);
+  const bar = el('div', 't-bar');
+  const fill = el('i');
+  bar.append(fill);
+  row.append(head, bar);
+  t.row = {el: row, icon, stat, fill};
+  return row;
+}
+
+function dlTaskIcon(t) {
+  return t.status === 'done' ? '✔' : t.status === 'active' ? '⏬' : t.status === 'error' ? '⚠'
+       : t.status === 'cancelled' ? '⏹' : '…';
+}
+
+function dlTaskPaint(t) {
+  if (!t.row) return;
+  t.row.el.className = 'task' + (t.status === 'done' ? ' done' : '');
+  t.row.icon.textContent = dlTaskIcon(t);
+  if (t.status === 'active')
+    t.row.stat.textContent = human(t.got) + (t.total ? ' / ' + human(t.total) : '')
+      + (t.speed > 0 ? ' · ' + human(t.speed) + '/s' : '');
+  else if (t.status === 'done')
+    t.row.stat.textContent = t.note || (t.total ? human(t.total) : 'done');
+  else if (t.status === 'error')
+    t.row.stat.textContent = t.err || 'failed';
+  else if (t.status === 'cancelled')
+    t.row.stat.textContent = 'cancelled';
+  if (t.total) t.row.fill.style.width = (t.got / t.total * 100).toFixed(1) + '%';
+}
+
+setInterval(() => { // 补位调度: 完成过快(<启动间隔)时周期性补发排队任务
+  if (state.dlActive < (state.dlConc || 2) && state.dlTasks.some(t => t.status === 'queued'))
+    dlPump(state.dlDirect);
+}, 500);
+setInterval(() => { // 速度采样 + 活动行重绘(500ms)
+  const now = Date.now();
+  for (const t of state.dlTasks) {
+    if (t.status !== 'active') continue;
+    const dt = (now - t.spT) / 1000;
+    if (dt >= 0.45) {
+      const v = (t.got - t.spB) / dt;
+      t.speed = t.speed ? t.speed * 0.6 + v * 0.4 : v;
+      t.spT = now; t.spB = t.got;
+    }
+    dlTaskPaint(t);
+  }
+}, 500);
+
+async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件
+  if (t.fctrl) t.fctrl.abort();
+  if (t.root && t.segs) {
+    try {
+      let dir = t.root;
+      for (const sg of t.segs.slice(0, -1)) dir = await dir.getDirectoryHandle(sg);
+      await dir.removeEntry(t.segs[t.segs.length - 1]);
+    } catch (e) { /* 文件不存在等 */ }
+  }
+  state.dlTasks = state.dlTasks.filter(x => x !== t);
+  if (t.row) t.row.el.remove();
+  dlTaskRender();
+}
+
+async function dlTaskRun(t, direct) {
+  t.status = 'active';
+  t.spT = Date.now(); t.spB = 0;
+  state.dlActive++;
+  dlTaskPaint(t); dlTaskRender();
+  const fctrl = new AbortController();
+  t.fctrl = fctrl;
+  try {
+    let dir = t.root;
+    for (const sg of t.segs.slice(0, -1)) dir = await dir.getDirectoryHandle(sg, {create: true});
+    const fh = await dir.getFileHandle(t.segs[t.segs.length - 1], {create: true});
+    let have = 0;
+    try { have = (await fh.getFile()).size; } catch (e) {}
+    if (t.expected && have >= t.expected) { // 已完整: 标记完成
+      t.got = t.total = t.expected;
+      t.note = 'skipped (already complete)';
+      t.status = 'done';
+    } else {
+      const headers = (t.expected && have > 0) ? {Range: 'bytes=' + have + '-'} : undefined;
+      const src = direct ? t.url : '/api/proxy?url=' + encodeURIComponent(t.url);
+      const resp = await fetch(src, {signal: fctrl.signal, headers});
+      if (!resp.body || (resp.status !== 200 && resp.status !== 206))
+        throw new Error('HTTP ' + resp.status);
+      const from = resp.status === 206 ? have : 0;
+      t.got = from;
+      const clen = +(resp.headers.get('Content-Length') || 0);
+      t.total = (from + clen) || t.expected;
+      await writeFileBody(fh, resp, from, n => { t.got += n; });
+      t.status = 'done';
+    }
+  } catch (e) {
+    if (fctrl.signal.aborted) t.status = 'cancelled';
+    else { t.status = 'error'; t.err = String(e.message || e).slice(0, 80); }
+  }
+  t.fctrl = null;
+  state.dlActive--;
+  dlTaskPaint(t); dlTaskRender();
+  dlPump(direct);
+}
+
+function dlPump(direct) { // 动态并发调度: 按标题栏 Parallel 值补位, 启动间隔≥400ms 避直链竞态
+  const conc = state.dlConc || 2;
+  const now = Date.now();
+  for (const t of state.dlTasks) {
+    if (state.dlActive >= conc) break;
+    if (t.status !== 'queued') continue;
+    if (now - state.dlLastLaunch < 400) break;
+    state.dlLastLaunch = now;
+    dlTaskRun(t, direct);
+  }
+}
+
 async function downloadStructured(files, direct) {
   const tag = state.tag;
   const root = await pickRootDir();
-  const ctrl = new AbortController();
-  state.dlAbort = ctrl;
-  const conc = state.dlConc || 2;
-  dlPanelShow(tag, files);
-  const totalAll = files.reduce((s, f) => s + (f.size || 0), 0);
-  let doneAll = 0, bytesAll = 0, skipped = 0, cancelled = 0; // 完成 / 累计字节 / 跳过(已完成) / 单独取消
-  const failed = [];
-  let next = 0; // 队列指针, worker 间共享(单线程 JS, 取号安全)
-
-  let speed = 0, spT = Date.now(), spB = 0; // 速度: 窗口采样 + 平滑
-  const updateTotals = () => {
-    const now = Date.now(), dt = (now - spT) / 1000;
-    if (dt >= 0.4) {
-      const v = (bytesAll - spB) / dt;
-      speed = speed ? speed * 0.6 + v * 0.4 : v;
-      spT = now; spB = bytesAll;
-    }
-    $('#dlp-count').textContent = doneAll + '/' + files.length;
-    if (totalAll) $('#dlp-totalbar').style.width = (bytesAll / totalAll * 100).toFixed(1) + '%';
-    $('#dlp-totalpct').textContent = human(bytesAll) + ' / ' + human(totalAll)
-      + (speed > 0 ? ' · ' + human(speed) + '/s' : '');
-  };
-
-  async function worker(wid) {
-    if (wid) await new Promise(r => setTimeout(r, wid * 600)); // 错开首文件, 避免直链兑换竞态
-    while (!ctrl.signal.aborted) {
-      const i = next++;
-      if (i >= files.length) return;
-      const f = files[i];
-      const fctrl = new AbortController(); // 单文件取消; 全局取消时联动
-      ctrl.signal.addEventListener('abort', () => fctrl.abort(), {once: true});
-      const segs = [tag, ...f.path.split('/').map(safeSeg)];
-      const item = el('div', 'dlp-item');
-      const fname = el('div', 'dlp-file');
-      const n = el('span', 'n', segs.slice(1).join('/'));
-      const pct = el('span', 'dlp-pct');
-      const x = el('button', 'dlp-x', '✕');
-      x.title = 'Cancel this file';
-      x.addEventListener('click', () => fctrl.abort());
-      fname.append(n, pct, x);
-      const bar = el('div', 'dlp-bar');
-      const barFill = el('i');
-      bar.append(barFill);
-      item.append(fname, bar);
-      $('#dlp-files').append(item);
-      let got = 0, lastPaint = 0;
-      const expected = f.size || 0;
-      const paint = (fileBytes, clen) => { // 节流, 大文件 64KiB 块很多
-        const now = Date.now();
-        if (now - lastPaint < 150) return;
-        lastPaint = now;
-        if (clen) barFill.style.width = (fileBytes / clen * 100).toFixed(1) + '%';
-        pct.textContent = human(fileBytes) + (clen ? ' / ' + human(clen) : '');
-        updateTotals();
-      };
-      try {
-        let dir = root;
-        for (const s of segs.slice(0, -1)) dir = await dir.getDirectoryHandle(s, {create: true});
-        const fh = await dir.getFileHandle(segs[segs.length - 1], {create: true});
-        let have = 0;
-        try { have = (await fh.getFile()).size; } catch (e) {}
-        if (expected && have >= expected) { // 已完整: 跳过
-          skipped++;
-          item.remove();
-          doneAll++;
-          updateTotals();
-          continue;
-        }
-        const headers = (expected && have > 0) ? {Range: 'bytes=' + have + '-'} : undefined;
-        const src = direct ? f.url : '/api/proxy?url=' + encodeURIComponent(f.url);
-        const resp = await fetch(src, {signal: fctrl.signal, headers});
-        if (!resp.body || (resp.status !== 200 && resp.status !== 206))
-          throw new Error('HTTP ' + resp.status);
-        const from = resp.status === 206 ? have : 0; // 200 = 远端不支持续传, 整文件重下
-        got = from;
-        bytesAll += from;
-        const clen = +(resp.headers.get('Content-Length') || 0);
-        const total = (from + clen) || expected;
-        await writeFileBody(fh, resp, from, x => {
-          got += x; bytesAll += x;
-          paint(got, total);
-        });
-      } catch (e) {
-        if (fctrl.signal.aborted && !ctrl.signal.aborted) cancelled++; // 用户单独取消该文件
-        else if (!ctrl.signal.aborted) failed.push(f.path + ': ' + e.message);
-      }
-      item.remove();
-      doneAll++;
-      updateTotals();
-    }
+  $('#dl-tasks').querySelector('.dl-empty') && ($('#dl-tasks').textContent = '');
+  let added = 0;
+  for (const f of files) {
+    const segs = [tag, ...f.path.split('/').map(safeSeg)];
+    const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
+               expected: f.size || 0, root, status: 'queued',
+               got: 0, total: f.size || 0, speed: 0, spT: 0, spB: 0};
+    state.dlTasks.push(t);
+    $('#dl-tasks').append(dlTaskRow(t));
+    added++;
   }
-
-  try {
-    await Promise.all([...Array(conc)].map((_, i) => worker(i)));
-  } finally {
-    state.dlAbort = null;
-    dlPanelHide();
-  }
-  if (ctrl.signal.aborted) { toast('Download cancelled (' + doneAll + ' files done)'); return; }
-  const note = (skipped ? ', skipped ' + skipped + ' complete' : '')
-             + (cancelled ? ', cancelled ' + cancelled : '');
-  if (failed.length) toast('Done ' + (doneAll - skipped - cancelled - failed.length)
-                         + ', failed ' + failed.length + note + ': ' + failed[0]);
-  else toast('Downloaded ' + (doneAll - skipped - cancelled) + ' files' + note + ' → ' + tag + '/ tree');
+  dlTaskRender();
+  state.dlDirect = direct;
+  dlPump(direct);
+  toast('Queued ' + added + ' tasks → ' + tag + '/ tree');
 }
 
 /* ---------- 服务端下载: 按 Setup 配置的 Save to 目录落盘, 目录树 <dir>/<tag>/<board>/<sec>/<cat>/[ota/]<file> ---------- */
@@ -1296,6 +1373,13 @@ setInterval(async () => {
     }
   } catch (e) {}
 }, 2000);
+const dlCard = $('#dl-list-card');
+if (localStorage.getItem('dl-collapsed') === '1') { dlCard.classList.add('collapsed'); $('#dl-collapse').textContent = '▸'; }
+$('#dl-collapse').addEventListener('click', () => {
+  const c = dlCard.classList.toggle('collapsed');
+  $('#dl-collapse').textContent = c ? '▸' : '▾';
+  localStorage.setItem('dl-collapsed', c ? '1' : '0');
+});
 const concSel = $('#dl-conc');
 concSel.value = localStorage.getItem('dl-conc') || '2';
 concSel.addEventListener('change', () => {

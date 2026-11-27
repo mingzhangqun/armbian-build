@@ -206,6 +206,7 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 .t-head{display:flex;align-items:center;gap:8px;min-width:0}
 .t-icon{flex:none;width:18px;text-align:center;font-size:13px;color:var(--muted)}
 .task.done .t-icon{color:#1a9e4b;font-weight:700}
+.t-icon:has(svg){color:#26a269} /* aria2 logo 官方绿 */
 .t-name{flex:1;min-width:0;font-family:var(--mono);font-size:11px;word-break:break-all;
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .t-stat{flex:none;color:var(--muted);font-size:11px;white-space:nowrap}
@@ -1063,8 +1064,12 @@ function dlTaskRow(t) {
   return row;
 }
 
+const ARIA2_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" style="vertical-align:-2px" '
+  + 'xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-label="aria2">'
+  + '<path d="M8 1.6 14.6 13.4h-2.9L8 6.9 4.3 13.4H1.4Z"/>'
+  + '<path d="M8 10.2l1.7 3.2H6.3Z"/></svg>';
 function dlTaskIcon(t) {
-  if (t.status === 'aria2') return '⇗';
+  if (t.status === 'aria2') return ARIA2_ICON;
   const resumable = !t.root && t.status !== 'done';
   if (resumable) return '▶';
   return t.status === 'done' ? '✔' : t.status === 'active' ? '⏬' : t.status === 'error' ? '⚠'
@@ -1090,7 +1095,8 @@ async function dlTaskResume(t) { // 恢复任务: 本地走服务端(无弹窗),
 function dlTaskPaint(t) {
   if (!t.row) return;
   t.row.el.className = 'task' + (t.status === 'done' ? ' done' : '');
-  t.row.icon.textContent = dlTaskIcon(t);
+  if (t.status === 'aria2') t.row.icon.innerHTML = dlTaskIcon(t); // SVG logo
+  else t.row.icon.textContent = dlTaskIcon(t);
   if (t.status === 'active')
     t.row.stat.textContent = human(t.got) + (t.total ? ' / ' + human(t.total) : '')
       + (t.speed > 0 ? ' · ' + human(t.speed) + '/s' : '');

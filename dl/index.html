@@ -71,6 +71,7 @@ body.aria2-on #btn-aria2-push{display:inline-block}
 .slottag.st{color:#8dc215;border-color:rgba(141,194,21,.55);background:rgba(141,194,21,.12)}
 .slottag.pre{color:#ffbc44;border-color:rgba(255,188,68,.55);background:rgba(255,188,68,.12)}
 .slottag.prev{color:#b9cdd4;border-color:rgba(185,205,212,.45);background:rgba(185,205,212,.08)}
+.slottagid{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--ink);margin-left:6px}
 
 /* ---- board 单选卡片 ---- */
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -192,8 +193,10 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
   <section class="card">
     <h2><i class="step">1</i>Setup</h2>
     <div class="cfg-row"><span class="cfg-k">Download</span>
-      <span class="cfg-v"><input id="dl-root" class="cfg-input fill" type="text" spellcheck="false" placeholder="~/Downloads">
-        <span class="cfg-time" id="dl-root-stat"></span></span>
+      <span class="cfg-v"><span class="cfg-time" id="dl-root-stat"></span></span>
+    </div>
+    <div class="cfg-row cfg-ind">
+      <input id="dl-root" class="cfg-input fill" type="text" spellcheck="false" placeholder="~/Downloads">
     </div>
     <div class="cfg-row cfg-sep"><span class="cfg-k">Source</span>
       <span class="cfg-v"><span class="stat err" id="src-stat">Failed</span>
@@ -212,7 +215,7 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
   </section>
 
   <section class="card">
-    <h2><i class="step">2</i>Select Build (slot) <span class="sub">single</span></h2>
+    <h2><i class="step">2</i>Select Slot <span class="sub">single</span></h2>
     <div id="slots" class="pills"><div class="loading">Loading…</div></div>
   </section>
 
@@ -413,7 +416,7 @@ function renderSlots() {
     // slot 名做成 label 样式, 配色对齐官方页: stable 绿 / pre-release 琥珀 / history 灰
     const slotCls = s.name === 'stable' ? 'st' : (s.name === 'pre-release' ? 'pre' : 'prev');
     const t = el('div', 't');
-    t.append(el('span', 'slottag ' + slotCls, s.name), document.createTextNode('  ·  ' + s.tag));
+    t.append(el('span', 'slottag ' + slotCls, s.name), el('span', 'slottagid', s.tag));
     const meta = el('div', 'm', [fmtDate(m.created), n + ' files'].filter(Boolean).join(' · '));
     body.append(t, meta);
     label.append(input, body);

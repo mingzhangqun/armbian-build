@@ -34,7 +34,8 @@ h2 .spacer{margin-left:auto}
 body.static #row-save-to{display:none}
 #row-aria2,#row-aria2-in{display:none}
 body.has-aria2 #row-aria2,body.has-aria2 #row-aria2-in{display:flex}
-body:not(.has-aria2) #btn-aria2-push{display:none}
+#btn-aria2-push{display:none}
+body.has-aria2.aria2-on #btn-aria2-push{display:inline-block}
 .cfg-k{width:58px;flex:none;font-size:13px;font-weight:600}
 .cfg-v{display:flex;align-items:center;gap:6px;min-width:0;flex:1;flex-wrap:wrap}
 .cfg-time{font-size:12px;color:var(--muted)}
@@ -251,7 +252,7 @@ else document.body.className = 'static';
       </span>
     </div>
     <div class="cfg-row cfg-sep" id="row-aria2"><span class="cfg-k">Aria2</span>
-      <span class="cfg-v"><span class="stat err" id="aria2-stat">Not Connected</span></span>
+      <span class="cfg-v"><span class="stat err" id="aria2-stat">Disconnected</span></span>
     </div>
     <div class="cfg-row cfg-ind" id="row-aria2-in">
       <input id="aria2-url" type="url" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
@@ -470,7 +471,10 @@ function selectedFiles() {
 function renderMeta() {
   $('#refresh-time').textContent = state.meta ? fmtDate(state.meta.fetched_at) : '';
   const stat = $('#src-stat');
-  if (state.meta) { stat.textContent = 'Updated'; stat.className = 'stat ok'; }
+  if (state.meta) {
+    stat.textContent = 'Updated'; stat.className = 'stat ok';
+    notifyState('srcOk', true, 'Data source updated');
+  }
   $('#src-input').value = state.url;
 }
 
@@ -678,6 +682,14 @@ function renderAll() { renderSlots(); renderBoards(); renderTypes(); renderFiles
 /* ---------- 动作 ---------- */
 
 let toastTimer = null;
+function notifyState(key, ok, msg) { // 状态迁移通知: 首次判定静默(失败除外), 之后变化才弹
+  const prev = state[key];
+  state[key] = ok;
+  if (prev === ok) return;
+  if (prev == null && ok) return; // 首次成功不打扰
+  toast((ok ? '✅ ' : '⚠️ ') + msg);
+}
+
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg; t.hidden = false;
@@ -777,10 +789,21 @@ async function aria2GlobalDir(endpoint, token) { // aria2 全局下载根(绝对
   } catch (e) { return ''; }
 }
 async function aria2Check() {
-  // 连通性检测: 状态标签显示 Connected / Not Connected
+  // 连通性检测: 状态标签 + 连接迁移通知(connected/disconnected)
+  // 飞行中被跳过(输入变化)时记脏标, 完成后用最新输入重查
+  if (state.aria2Checking) { state.aria2Dirty = true; return; }
+  state.aria2Checking = true;
+  try { await aria2CheckInner(); }
+  finally {
+    state.aria2Checking = false;
+    if (state.aria2Dirty) { state.aria2Dirty = false; aria2Check(); }
+  }
+}
+async function aria2CheckInner() {
   const stat = $('#aria2-stat');
   const endpoint = $('#aria2-url').value.trim();
-  if (!endpoint) { stat.textContent = 'Not Connected'; stat.className = 'stat err'; return; }
+  if (!endpoint) { stat.textContent = 'Disconnected'; stat.className = 'stat err';
+    document.body.classList.remove('aria2-on'); return; }
   const token = $('#aria2-token').value.trim();
   try {
     let err = null;
@@ -804,9 +827,13 @@ async function aria2Check() {
     if (err) throw new Error(err);
     stat.textContent = 'Connected';
     stat.className = 'stat ok';
+    document.body.classList.add('aria2-on');
+    notifyState('aria2Ok', true, 'aria2 connected');
   } catch (e) {
-    stat.textContent = 'Not Connected';
+    stat.textContent = 'Disconnected';
     stat.className = 'stat err';
+    document.body.classList.remove('aria2-on');
+    notifyState('aria2Ok', false, 'aria2 disconnected');
   }
 }
 function exportJson(files) {
@@ -887,7 +914,7 @@ state.dlLastLaunch = 0;
 state.dlSeq = 0;
 state.dlDirect = true;
 
-function dlTaskRender() { // 空态/汇总
+function dlTaskRender() { // 空态/汇总 + 持久化
   const box = $('#dl-tasks');
   if (!state.dlTasks.length && !box.querySelector('.dl-empty'))
     box.textContent = '', box.append(el('div', 'dl-empty', 'No download tasks'));
@@ -895,6 +922,31 @@ function dlTaskRender() { // 空态/汇总
   const act = state.dlTasks.filter(t => t.status === 'active').length;
   $('#dl-summary').textContent = state.dlTasks.length
     ? act + ' active · ' + done + '/' + state.dlTasks.length + ' done' : '';
+  dlTaskSave();
+}
+
+function dlTaskSave() { // 任务列表持久化(localStorage), 刷新后恢复
+  try {
+    localStorage.setItem('dl-tasks', JSON.stringify(state.dlTasks.map(t => ({
+      segs: t.segs, name: t.name, url: t.url, expected: t.expected,
+      status: t.status === 'active' ? 'paused' : t.status, // 刷新时进行中 → 暂停
+      got: t.got, total: t.total, note: t.note, err: t.err, direct: t.direct,
+    }))));
+  } catch (e) {}
+}
+
+function dlTaskRestore() { // 刷新后恢复任务行(root 待续传时重选)
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem('dl-tasks') || '[]'); } catch (e) {}
+  if (!saved.length) return;
+  $('#dl-tasks').textContent = '';
+  for (const t of saved) {
+    t.root = null; t.speed = 0; t.spT = 0; t.spB = t.got || 0; t.id = ++state.dlSeq;
+    state.dlTasks.push(t);
+    $('#dl-tasks').append(dlTaskRow(t));
+    dlTaskPaint(t);
+  }
+  dlTaskRender();
 }
 
 function dlTaskRow(t) {
@@ -911,13 +963,28 @@ function dlTaskRow(t) {
   const fill = el('i');
   bar.append(fill);
   row.append(head, bar);
+  icon.addEventListener('click', async () => {
+    if (!t.root && t.status !== 'done') dlTaskResume(t);
+  });
   t.row = {el: row, icon, stat, fill};
   return row;
 }
 
 function dlTaskIcon(t) {
+  const resumable = !t.root && t.status !== 'done';
+  if (resumable) return '▶';
   return t.status === 'done' ? '✔' : t.status === 'active' ? '⏬' : t.status === 'error' ? '⚠'
        : t.status === 'cancelled' ? '⏹' : '…';
+}
+
+async function dlTaskResume(t) { // 恢复任务: 重选目录(应用到所有无 root 任务), 按实际文件续传
+  try { const root = await pickRootDir(); 
+    for (const x of state.dlTasks) if (!x.root) x.root = root;
+  } catch (e) { return; } // 用户取消选择
+  for (const x of state.dlTasks)
+    if (x.status === 'paused' || x.status === 'cancelled' || x.status === 'error') x.status = 'queued';
+  dlTaskRender();
+  dlPump(t.direct !== false);
 }
 
 function dlTaskPaint(t) {
@@ -932,7 +999,9 @@ function dlTaskPaint(t) {
   else if (t.status === 'error')
     t.row.stat.textContent = t.err || 'failed';
   else if (t.status === 'cancelled')
-    t.row.stat.textContent = 'cancelled';
+    t.row.stat.textContent = t.root ? 'cancelled' : 'cancelled — click ▶ to resume';
+  else if (t.status === 'paused')
+    t.row.stat.textContent = 'paused — click ▶ to resume';
   if (t.total) t.row.fill.style.width = (t.got / t.total * 100).toFixed(1) + '%';
 }
 
@@ -952,6 +1021,7 @@ setInterval(() => { // 速度采样 + 活动行重绘(500ms)
     }
     dlTaskPaint(t);
   }
+  if (state.dlTasks.some(t => t.status === 'active')) dlTaskSave();
 }, 500);
 
 async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件
@@ -1013,7 +1083,7 @@ function dlPump(direct) { // 动态并发调度: 按标题栏 Parallel 值补位
   const now = Date.now();
   for (const t of state.dlTasks) {
     if (state.dlActive >= conc) break;
-    if (t.status !== 'queued') continue;
+    if (t.status !== 'queued' || !t.root) continue;
     if (now - state.dlLastLaunch < 400) break;
     state.dlLastLaunch = now;
     dlTaskRun(t, direct);
@@ -1028,7 +1098,7 @@ async function downloadStructured(files, direct) {
   for (const f of files) {
     const segs = [tag, ...f.path.split('/').map(safeSeg)];
     const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
-               expected: f.size || 0, root, status: 'queued',
+               expected: f.size || 0, root, status: 'queued', direct: !!direct,
                got: 0, total: f.size || 0, speed: 0, spT: 0, spB: 0};
     state.dlTasks.push(t);
     $('#dl-tasks').append(dlTaskRow(t));
@@ -1186,9 +1256,13 @@ async function loadData(refresh) {
     const stat = $('#src-stat');
     stat.textContent = 'Failed';
     stat.className = 'stat err';
-    if (!state.data) { // 首次加载失败才清空; 刷新失败保留现有页面
-      ['#slots', '#boards', '#types', '#files-wrap'].forEach(s => { $(s).textContent = ''; });
-    }
+    notifyState('srcOk', false, 'Data source failed: ' + e.message);
+    ['#slots', '#boards', '#types', '#files-wrap'].forEach(x => { $(x).textContent = ''; });
+    state.checked.clear();
+    $('#files-sub').textContent = '';
+    $('#sum').innerHTML = 'Nothing selected';
+    ['#btn-copy-paths', '#btn-copy-urls', '#btn-curl', '#btn-export', '#btn-aria2-push', '#btn-download']
+      .forEach(id => { $(id).disabled = true; });
     return false;
   }
 }
@@ -1373,6 +1447,11 @@ setInterval(async () => {
     }
   } catch (e) {}
 }, 2000);
+dlTaskRestore();
+setInterval(() => { // aria2 健康巡检: 状态变化时通知
+  if (!document.body.classList.contains('has-aria2')) return;
+  if ($('#aria2-url').value.trim()) aria2Check();
+}, 30000);
 const dlCard = $('#dl-list-card');
 if (localStorage.getItem('dl-collapsed') === '1') { dlCard.classList.add('collapsed'); $('#dl-collapse').textContent = '▸'; }
 $('#dl-collapse').addEventListener('click', () => {

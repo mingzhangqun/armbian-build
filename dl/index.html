@@ -903,14 +903,22 @@ async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权�
   if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
   try { state.dlRootHandle = (await idbKv('readonly', 'dlRoot')) || null; } catch (e) {}
   if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
-  // startIn 只认固定位置或已授权句柄: 优先上次句柄, 其次按 Setup-Download 映射已知目录
+  // startIn 只认固定位置或已授权句柄: 优先上次句柄, 否则按 Setup-Download 中的已知目录名定位
   const WELL = [['downloads', 'downloads'], ['documents', 'documents'], ['desktop', 'desktop'],
                 ['pictures', 'pictures'], ['music', 'music'], ['videos', 'videos']];
   let startIn = state.dlRootHandle || 'downloads';
-  const dv = ($('#dl-root').value.trim() || '~/Downloads').toLowerCase();
+  const dv = ($('#dl-root').value.trim() || '~/Downloads/armbian').toLowerCase();
   for (const [name, token] of WELL)
-    if (dv === '~/' + name || dv.endsWith('/' + name)) { startIn = token; break; }
-  const root = await window.showDirectoryPicker({mode: 'readwrite', startIn});
+    if (dv === '~/' + name || dv.includes('/' + name + '/')) { startIn = token; break; }
+  let root = await window.showDirectoryPicker({mode: 'readwrite', startIn});
+  // 所选目录 ≠ Download 配置的末级目录时, 自动进入/创建该子目录作为真实下载根
+  const want = ($('#dl-root').value.trim() || '~/Downloads/armbian').replace(/\/+$/, '').split('/').pop();
+  if (want && root.name !== want) {
+    try {
+      root = await root.getDirectoryHandle(want, {create: true});
+      toast('Download root → …/' + want + '/');
+    } catch (e) {}
+  }
   state.dlRootHandle = root;
   try { await idbKv('readwrite', 'dlRoot', root); } catch (e) {}
   return root;

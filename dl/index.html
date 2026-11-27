@@ -43,7 +43,7 @@ body.aria2-on #btn-aria2-push{display:inline-block}
                border-radius:8px;padding:8px 10px;color:var(--ink)}
 .cfg-ind input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 #src-input,#dl-root{font-family:var(--mono)}
-#dl-dir{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
+#dl-dir,#dl-root{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
         border-radius:8px;padding:8px 10px;color:var(--ink)}
 #btn-dl-dir{min-width:86px;padding:8px 14px;white-space:nowrap;flex:none}
 /* ---- 目录选择弹窗 ---- */
@@ -229,10 +229,8 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
   <section class="card">
     <h2><i class="step">1</i>Setup</h2>
     <div class="cfg-row"><span class="cfg-k">Download</span>
-      <span class="cfg-v"><span class="cfg-time" id="dl-root-stat"></span></span>
-    </div>
-    <div class="cfg-row cfg-ind">
-      <input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
+      <span class="cfg-v"><input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
+        <span class="cfg-time" id="dl-root-stat"></span></span>
     </div>
     <div class="cfg-row cfg-sep"><span class="cfg-k">Source</span>
       <span class="cfg-v"><span class="stat err" id="src-stat">Failed</span>

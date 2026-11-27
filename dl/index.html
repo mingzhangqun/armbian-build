@@ -1014,7 +1014,13 @@ function dlTaskIcon(t) {
        : t.status === 'cancelled' ? '⏹' : '…';
 }
 
-async function dlTaskResume(t) { // 恢复任务: 重选目录(应用到所有无 root 任务), 按实际文件续传
+async function dlTaskResume(t) { // 恢复任务: 本地走服务端(无弹窗), 静态重选目录
+  const pend = state.dlTasks.filter(x => ['paused', 'cancelled', 'error'].includes(x.status));
+  if (state.localServer) {
+    const files = pend.map(x => ({path: x.name, url: x.url, size: x.expected}));
+    if (files.length) downloadServerTasks(files, pend);
+    return;
+  }
   try { const root = await pickRootDir(); 
     for (const x of state.dlTasks) if (!x.root) x.root = root;
   } catch (e) { return; } // 用户取消选择
@@ -1084,6 +1090,8 @@ async function aria2RemoveTask(gid) { // 从 aria2 移除任务(活动+历史记
 async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件
   if (t.fctrl) t.fctrl.abort();
   if (t.status === 'aria2') await aria2RemoveTask(t.gid);
+  if (t.status === 'active' && !t.root && state.localServer)
+    fetch('/api/job/cancel', {method: 'POST'}); // 服务端任务: 取消整个 job
   if (t.root && t.segs) {
     try {
       let dir = t.root;
@@ -1251,7 +1259,70 @@ async function pollServerJob(base) { // 轮询 /api/job 直到结束; base 用�
   }
 }
 
-async function downloadAll(files) { // Add to Downloads: 直接入列(仅首次需选目录), 无弹窗
+async function downloadServerTasks(files, reuse) { // 服务端任务: Python 落盘, 无浏览器授权弹窗
+  const box = $('#dl-tasks');
+  if (box.querySelector('.dl-empty')) box.textContent = '';
+  const tasks = reuse || files.map(f => {
+    const segs = [state.tag, ...f.path.split('/').map(safeSeg)];
+    const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
+               expected: f.size || 0, root: null, status: 'active',
+               got: 0, total: f.size || 0, speed: 0, spT: Date.now(), spB: 0};
+    state.dlTasks.push(t);
+    box.append(dlTaskRow(t));
+    dlTaskPaint(t);
+    return t;
+  });
+  dlTaskRender(); renderFiles();
+  let base = '';
+  try {
+    const resp = await fetch('/api/download', {method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({conc: state.dlConc || 2,
+        files: files.map(f => ({dest: state.tag + '/' + f.path, url: f.url, size: f.size || 0}))})});
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    base = j.base || '';
+  } catch (e) {
+    tasks.forEach(t => { t.status = 'error'; t.err = String(e.message).slice(0, 60); dlTaskPaint(t); });
+    dlTaskRender(); renderFiles();
+    toast('Server download failed: ' + e.message);
+    return;
+  }
+  const byDest = new Map(tasks.map(t => [state.tag + '/' + t.name, t]));
+  (async () => { // 轮询 /api/job, 映射到任务行
+    while (true) {
+      await new Promise(r => setTimeout(r, 600));
+      let job;
+      try { job = await (await fetch('/api/job')).json(); } catch (e) { continue; }
+      for (const a of job.active || []) {
+        const t = byDest.get(a.name);
+        if (t) { t.got = a.got; t.total = a.total || t.total; dlTaskPaint(t); }
+      }
+      if (!job.running) {
+        const errNames = new Set((job.errors || []).map(e => e.split(':')[0]));
+        for (const t of tasks) {
+          if (t.status !== 'active') continue;
+          if (job.status === 'cancelled') t.status = 'cancelled';
+          else if (errNames.has(state.tag + '/' + t.name)) { t.status = 'error'; t.err = 'failed'; }
+          else { t.status = 'done'; if (job.skipped && !t.got) t.note = 'skipped (already complete)'; }
+          dlTaskPaint(t);
+        }
+        dlTaskRender();
+        const note = job.skipped ? ', skipped ' + job.skipped + ' complete' : '';
+        if (job.status === 'cancelled') toast('Download cancelled');
+        else if ((job.errors || []).length) toast('Done, failed ' + job.errors.length + note + ': ' + job.errors[0]);
+        else toast('Downloaded → ' + (base ? base + '/' : '') + state.tag + '/ tree' + note);
+        return;
+      }
+    }
+  })();
+}
+
+async function downloadAll(files) { // Add to Downloads: 直接入列, 本地走服务端(零弹窗)
+  if (state.localServer) {
+    await downloadServerTasks(files);
+    return;
+  }
   if (window.showDirectoryPicker) {
     // 目录树 <root>/<tag>/<board>/<variant>/<cat>/[ota/]<file>;
     // 静态模式直连远端(SharePoint 直链带 ACAO:*), 本地模式经 /api/proxy

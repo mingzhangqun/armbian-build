@@ -1166,6 +1166,12 @@ function dlPump(direct) { // 动态并发调度: 按标题栏 Parallel 值补位
 async function downloadStructured(files, direct) {
   const tag = state.tag;
   const root = await pickRootDir();
+  try { await root.getDirectoryHandle(DL_SUB, {create: true}); } // 探测: 句柄指向的目录已不存在时提前失败
+  catch (e) {
+    state.dlRootHandle = null;
+    try { await idbKv('readwrite', 'dlRoot', null); } catch (e2) {}
+    throw e; // 交给 downloadAll 的 NotFoundError 分支清句柄重选
+  }
   $('#dl-tasks').querySelector('.dl-empty') && ($('#dl-tasks').textContent = '');
   let added = 0;
   for (const f of files) {
@@ -1328,7 +1334,7 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
   })();
 }
 
-async function downloadAll(files) { // Add to Downloads: 直接入列, 本地走服务端(零弹窗)
+async function downloadAll(files, _retry) { // Add to Downloads: 直接入列, 本地走服务端(零弹窗)
   if (state.localServer) {
     await downloadServerTasks(files);
     return;
@@ -1340,6 +1346,12 @@ async function downloadAll(files) { // Add to Downloads: 直接入列, 本地走
       await downloadStructured(files, !state.localServer);
       return;
     } catch (e) {
+      if (e && e.name === 'NotFoundError' && !_retry) { // 记忆的目录已被删/移走: 清掉重来
+        state.dlRootHandle = null;
+        try { await idbKv('readwrite', 'dlRoot', null); } catch (e2) {}
+        toast('Remembered folder no longer exists — please re-select');
+        return downloadAll(files, true);
+      }
       if (e && e.name === 'AbortError') { // 仅首次选择时取消
         toast('Cancelled. Tip: pick the folder matching Setup → Download ('
              + ($('#dl-root').value.trim() || '~/Downloads') + ')');

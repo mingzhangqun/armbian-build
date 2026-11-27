@@ -737,11 +737,13 @@ async function aria2Push(files, pickDir) {
       });
       const j = await resp.json();
       if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+      var gids = j.gids || [];
       if (j.errors && j.errors.length) toast('Pushed ' + j.ok + ', failed: ' + j.errors[0]);
       else toast('Pushed ' + j.ok + ' tasks → ' + endpoint.replace(/^https?:\/\//, '')
                + (base ? ' · ' + base + state.tag + '/' : ' · ' + state.tag + '/'));
+      dlTaskAddAria2(files, gids);
     } else { // 直连逐条推送
-      let ok = 0; const errs = [];
+      let ok = 0; const errs = [], gids = [];
       for (const e of entries) {
         try {
           const resp = await fetch(endpoint, {
@@ -754,15 +756,32 @@ async function aria2Push(files, pickDir) {
           });
           const j = await resp.json();
           if (j.error) throw new Error(j.error.message || 'rpc error');
-          ok++;
-        } catch (er) { errs.push(e.out + ': ' + er.message); }
+          gids.push(j.result); ok++;
+        } catch (er) { errs.push(e.out + ': ' + er.message); gids.push(null); }
       }
       if (errs.length) toast('Pushed ' + ok + ', failed: ' + errs[0]);
       else toast('Pushed ' + ok + ' tasks → ' + base + state.tag + '/ tree');
+      dlTaskAddAria2(files, gids);
     }
   } catch (e) {
     toast('Push failed: ' + e.message);
   }
+}
+
+function dlTaskAddAria2(files, gids) { // 登记到 Downloads 列表: 防重复推送, ✕ 可移除
+  const box = $('#dl-tasks');
+  if (box.querySelector('.dl-empty')) box.textContent = '';
+  files.forEach((f, i) => {
+    const segs = [state.tag, ...f.path.split('/').map(safeSeg)];
+    const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
+               expected: f.size || 0, root: null, status: 'aria2', gid: gids && gids[i],
+               got: 0, total: f.size || 0, speed: 0, spT: 0, spB: 0};
+    state.dlTasks.push(t);
+    box.append(dlTaskRow(t));
+    dlTaskPaint(t);
+  });
+  dlTaskRender();
+  renderFiles();
 }
 async function aria2GlobalDir(endpoint, token) { // aria2 全局下载根(绝对路径)
   try {
@@ -947,7 +966,7 @@ function dlTaskSave() { // 任务列表持久化(localStorage), 刷新后恢复
     localStorage.setItem('dl-tasks', JSON.stringify(state.dlTasks.map(t => ({
       segs: t.segs, name: t.name, url: t.url, expected: t.expected,
       status: t.status === 'active' ? 'paused' : t.status, // 刷新时进行中 → 暂停
-      got: t.got, total: t.total, note: t.note, err: t.err, direct: t.direct,
+      got: t.got, total: t.total, note: t.note, err: t.err, direct: t.direct, gid: t.gid,
     }))));
   } catch (e) {}
 }
@@ -981,13 +1000,14 @@ function dlTaskRow(t) {
   bar.append(fill);
   row.append(head, bar);
   icon.addEventListener('click', async () => {
-    if (!t.root && t.status !== 'done') dlTaskResume(t);
+    if (!t.root && t.status !== 'done' && t.status !== 'aria2') dlTaskResume(t);
   });
   t.row = {el: row, icon, stat, fill};
   return row;
 }
 
 function dlTaskIcon(t) {
+  if (t.status === 'aria2') return '⇗';
   const resumable = !t.root && t.status !== 'done';
   if (resumable) return '▶';
   return t.status === 'done' ? '✔' : t.status === 'active' ? '⏬' : t.status === 'error' ? '⚠'
@@ -1019,6 +1039,8 @@ function dlTaskPaint(t) {
     t.row.stat.textContent = t.root ? 'cancelled' : 'cancelled — click ▶ to resume';
   else if (t.status === 'paused')
     t.row.stat.textContent = 'paused — click ▶ to resume';
+  else if (t.status === 'aria2')
+    t.row.stat.textContent = 'aria2';
   if (t.total) t.row.fill.style.width = (t.got / t.total * 100).toFixed(1) + '%';
 }
 
@@ -1041,8 +1063,27 @@ setInterval(() => { // 速度采样 + 活动行重绘(500ms)
   if (state.dlTasks.some(t => t.status === 'active')) dlTaskSave();
 }, 500);
 
+async function aria2RemoveTask(gid) { // 从 aria2 移除任务(活动+历史记录)
+  if (!gid) return;
+  const endpoint = $('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc';
+  const token = $('#aria2-token').value.trim();
+  for (const m of ['aria2.remove', 'aria2.forceRemove', 'aria2.removeDownloadResult']) {
+    try {
+      if (state.localServer) {
+        await fetch('/api/rpc', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({endpoint, token, method: m, params: [gid]})});
+      } else {
+        await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({jsonrpc: '2.0', id: 'imgs-web', method: m,
+                                params: [...(token ? ['token:' + token] : []), gid]})});
+      }
+    } catch (e) {}
+  }
+}
+
 async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件
   if (t.fctrl) t.fctrl.abort();
+  if (t.status === 'aria2') await aria2RemoveTask(t.gid);
   if (t.root && t.segs) {
     try {
       let dir = t.root;

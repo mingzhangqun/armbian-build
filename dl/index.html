@@ -1288,9 +1288,11 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
   dlTaskRender(); renderFiles();
   let base = '';
   try {
+    // 落盘根 = Setup-Download 配置(展开 ~ 为绝对路径); 为空/相对则用服务端 Save to 配置
+    const want = await dlRootAbs();
     const resp = await fetch('/api/download', {method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({conc: state.dlConc || 2,
+      body: JSON.stringify({conc: state.dlConc || 2, base: want || undefined,
         files: files.map(f => ({dest: state.tag + '/' + f.path, url: f.url, size: f.size || 0}))})});
     const j = await resp.json();
     if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));

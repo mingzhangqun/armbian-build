@@ -894,6 +894,7 @@ const idbKv = (mode, k, v) => new Promise((res, rej) => { // 轻量 KV(IndexedDB
   rq.onerror = () => rej(rq.error);
 });
 async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权限吊销时才重选
+  state.dlHandleReady = true;
   const okOrPrompt = async h => { // granted 直用; denied 提示并不再弹选择器; prompt 一键确认
     const p = await h.queryPermission({mode: 'readwrite'});
     if (p === 'granted') return h;
@@ -904,11 +905,23 @@ async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权�
     if (await h.requestPermission({mode: 'readwrite'}) === 'granted') return h;
     return null;
   };
-  if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
+  if (state.dlRootHandle) {
+    const r = await okOrPrompt(state.dlRootHandle);
+    if (r) return r;
+    // 授权被拒/取消: 彻底丢弃句柄(内存+IDB), 避免下次重复 requestPermission 被 Chrome 节流(停顿数秒)
+    state.dlRootHandle = null;
+    try { await idbKv('readwrite', 'dlRoot', null); } catch (e) {}
+  }
   if (!state.dlHandleReady) { // 预热未完成(极少数快速点击)才现场读 IDB
     try { state.dlRootHandle = (await idbKv('readonly', 'dlRoot')) || null; } catch (e) {}
   }
-  if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
+  if (state.dlRootHandle) {
+    const r = await okOrPrompt(state.dlRootHandle);
+    if (r) return r;
+    // 授权被拒/取消: 彻底丢弃句柄(内存+IDB), 避免下次重复 requestPermission 被 Chrome 节流(停顿数秒)
+    state.dlRootHandle = null;
+    try { await idbKv('readwrite', 'dlRoot', null); } catch (e) {}
+  }
   // startIn 只认固定位置或已授权句柄: 优先上次句柄, 否则按 Setup-Download 中的已知目录名定位
   const WELL = [['downloads', 'downloads'], ['documents', 'documents'], ['desktop', 'desktop'],
                 ['pictures', 'pictures'], ['music', 'music'], ['videos', 'videos']];
@@ -1601,7 +1614,9 @@ $('#dl-dir').addEventListener('keydown', e => { if (e.key === 'Enter') saveDlDir
    if (!v || v === '~/Downloads/armbian') localStorage.setItem('dl-root', '~/Downloads'); }
 $('#dl-root').value = localStorage.getItem('dl-root') || '~/Downloads';
 $('#dl-root').addEventListener('change', () => {
-  localStorage.setItem('dl-root', $('#dl-root').value.trim());
+  const v = $('#dl-root').value.trim();
+  localStorage.setItem('dl-root', v);
+  if (v) toast('Download path: ' + v);
 });
 
 let dlmCurrent = null;

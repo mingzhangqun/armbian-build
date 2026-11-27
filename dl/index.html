@@ -46,10 +46,6 @@ body.aria2-on #btn-aria2-push{display:inline-block}
 #dl-dir,#dl-root{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
         border-radius:8px;padding:8px 10px;color:var(--ink)}
 #btn-dl-dir{min-width:86px;padding:8px 14px;white-space:nowrap;flex:none}
-/* ---- 路径输入弹窗 ---- */
-#dlpath{position:fixed;inset:0;z-index:40;background:rgba(23,29,43,.45);
-        display:flex;align-items:center;justify-content:center}
-#dlpath[hidden]{display:none}
 /* ---- 目录选择弹窗 ---- */
 #dlmodal{position:fixed;inset:0;z-index:40;background:rgba(23,29,43,.45);
          display:flex;align-items:center;justify-content:center}
@@ -215,8 +211,6 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 .t-bar{height:5px;background:var(--chip);border-radius:3px;overflow:hidden;margin-top:5px}
 .t-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px}
 .task.done .t-bar i{background:#1a9e4b}
-#dl-collapse{padding:4px 10px}
-#dl-list-card.collapsed #dl-tasks{display:none}
 .loading{padding:40px;text-align:center;color:var(--muted)}
 </style>
 </head>
@@ -311,25 +305,11 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
           <option value="8">8</option>
         </select>
       </label>
-      <button id="dl-collapse" class="btn" title="Collapse">▾</button>
     </h2>
     <div id="dl-tasks"><div class="dl-empty">No download tasks</div></div>
   </section>
 
 </main>
-
-<div id="dlpath" hidden>
-  <div class="dlm-card">
-    <div class="dlm-head">Download folder<button id="dlp-close" class="btn">✕</button></div>
-    <div class="dlm-path" style="padding:10px 14px">
-      <input id="dlp-input" type="text" spellcheck="false" style="width:100%;font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink)">
-    </div>
-    <div class="dlm-foot">
-      <button id="dlp-cancel" class="btn">Cancel</button>
-      <button id="dlp-ok" class="btn lgreen">OK</button>
-    </div>
-  </div>
-</div>
 
 <div id="dlmodal" hidden>
   <div class="dlm-card">
@@ -877,8 +857,39 @@ function safeSeg(s) { // 路径段清洗: 防路径穿越
   return s.replace(/[\/\\\0]/g, '_').replace(/^\.+$/, '_') || '_';
 }
 
-async function pickRootDir() { // 每次都弹系统目录选择器(不做记忆)
-  return await window.showDirectoryPicker({mode: 'readwrite'});
+const idbKv = (mode, k, v) => new Promise((res, rej) => { // 轻量 KV(IndexedDB), 存目录句柄
+  const rq = indexedDB.open('imgs-web', 1);
+  rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
+  rq.onsuccess = () => {
+    try {
+      const tx = rq.result.transaction('kv', mode);
+      const op = mode === 'readwrite' ? tx.objectStore('kv').put(v, k) : tx.objectStore('kv').get(k);
+      op.onsuccess = () => res(op.result);
+      op.onerror = () => rej(op.error);
+    } catch (e) { rej(e); } // 同步异常(如句柄不可克隆)也要落地 Promise
+  };
+  rq.onerror = () => rej(rq.error);
+});
+async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权限吊销时才重选
+  if (state.dlRootHandle) {
+    if (await state.dlRootHandle.queryPermission({mode: 'readwrite'}) === 'granted')
+      return state.dlRootHandle;
+    if (await state.dlRootHandle.requestPermission({mode: 'readwrite'}) === 'granted')
+      return state.dlRootHandle;
+    state.dlRootHandle = null;
+  }
+  try { state.dlRootHandle = (await idbKv('readonly', 'dlRoot')) || null; } catch (e) {}
+  if (state.dlRootHandle) {
+    if (await state.dlRootHandle.queryPermission({mode: 'readwrite'}) === 'granted')
+      return state.dlRootHandle;
+    if (await state.dlRootHandle.requestPermission({mode: 'readwrite'}) === 'granted')
+      return state.dlRootHandle;
+    state.dlRootHandle = null;
+  }
+  const root = await window.showDirectoryPicker({mode: 'readwrite'});
+  state.dlRootHandle = root;
+  try { await idbKv('readwrite', 'dlRoot', root); } catch (e) {}
+  return root;
 }
 
 async function writeFileBody(fh, resp, from, onChunk) {
@@ -1199,23 +1210,17 @@ async function pollServerJob(base) { // 轮询 /api/job 直到结束; base 用�
   }
 }
 
-async function downloadAll(files) {
-  if (state.localServer) { // 每次弹服务端目录浏览选择落盘位置(Save to 为起始目录)
-    browsePick(state.dlDir || '~', p => {
-      downloadServer(files, p).catch(e => console.warn('server download failed:', e));
-    });
-    return;
-  }
+async function downloadAll(files) { // Add to Downloads: 直接入列(仅首次需选目录), 无弹窗
   if (window.showDirectoryPicker) {
-    // 浏览器目录树下载 <tag>/<board>/<variant>/<cat>/[ota/]<file>;
-    // 静态模式直连远端(实测 SharePoint 直链已带 ACAO:*), 本地模式经 /api/proxy
+    // 目录树 <root>/<tag>/<board>/<variant>/<cat>/[ota/]<file>;
+    // 静态模式直连远端(SharePoint 直链带 ACAO:*), 本地模式经 /api/proxy
     try {
       await downloadStructured(files, !state.localServer);
       return;
     } catch (e) {
-      if (e && e.name === 'AbortError') { // 取消: Chrome 拒绝目录("contains system files")时也会走到这
-        toast('Cancelled. Tip: pick a clean/empty folder (e.g. ~/Downloads/armbian) — '
-             + 'files are saved under <folder>/' + state.tag + '/…');
+      if (e && e.name === 'AbortError') { // 仅首次选择时取消
+        toast('Cancelled. Tip: pick the folder matching Setup → Download ('
+             + ($('#dl-root').value.trim() || '~/Downloads') + ')');
         return;
       }
       console.warn('structured download failed, falling back:', e);
@@ -1297,18 +1302,27 @@ $('#file-filter').addEventListener('input', e => { state.filter = e.target.value
 $('#btn-copy-paths').addEventListener('click', () => copyText(selectedFiles().map(f => f.path).join('\n'), 'Paths copied'));
 $('#btn-copy-urls').addEventListener('click', () => copyText(selectedFiles().map(f => f.url).join('\n'), 'URLs copied'));
 $('#btn-curl').addEventListener('click', () => copyText(curlScript(selectedFiles()), 'curl script copied'));
-$('#btn-aria2-push').addEventListener('click', async () => {
-  const files = selectedFiles();
-  if (state.localServer) { // 本地: 弹服务端目录浏览
-    browsePick(state.dlDir || '~', p => aria2Push(files, p));
-    return;
+async function dlRootAbs() { // Setup-Download 路径 → 绝对路径(本地经 /api/browse 展开, 静态借 aria2 下载根推算 home)
+  let v = $('#dl-root').value.trim().replace(/\/+$/, '');
+  if (!v) return '';
+  if (v.startsWith('~')) {
+    if (state.localServer) {
+      try {
+        const j = await (await fetch('/api/browse?path=' + encodeURIComponent(v))).json();
+        if (j.path) return j.path;
+      } catch (e) {}
+    } else {
+      const g = await aria2GlobalDir($('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc',
+                                     $('#aria2-token').value.trim());
+      if (g) return g.replace(/\/[^/]+$/, '') + v.slice(1); // 下载根的上级 ≈ home
+    }
   }
-  // 静态: 系统选择器给不了绝对路径 → 路径输入框, 预填 aria2 下载根 + tag
-  const pref = $('#dl-root').value.trim().replace(/\/+$/, '');
-  const root = pref || await aria2GlobalDir($('#aria2-url').value.trim() || 'http://127.0.0.1:6800/jsonrpc',
-                                            $('#aria2-token').value.trim());
-  pathPrompt(((pref || root) ? (pref || root).replace(/\/+$/, '') + '/' : '') + state.tag,
-             p => p && aria2Push(files, p));
+  return v;
+}
+$('#btn-aria2-push').addEventListener('click', async () => { // 无弹窗, 复用 Setup-Download 路径
+  const files = selectedFiles();
+  if (!files.length) return;
+  aria2Push(files, (await dlRootAbs()) || undefined);
 });
 // RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
 const envReady = (async () => { // 环境检测: 本地 serve.py(全功能) / 纯静态(GitHub Pages, 降级)
@@ -1415,16 +1429,6 @@ async function browseLoad(p) {
     toast('Browse failed: ' + e.message);
   }
 }
-function pathPrompt(prefill, onOk) { // 路径输入弹窗(静态模式 Push 用)
-  const box = $('#dlpath');
-  $('#dlp-input').value = prefill || '';
-  box.hidden = false;
-  const done = ok => { box.hidden = true; if (ok) onOk($('#dlp-input').value.trim()); };
-  $('#dlp-ok').onclick = () => done(true);
-  $('#dlp-cancel').onclick = $('#dlp-close').onclick = () => done(false);
-  $('#dlp-input').onkeydown = e => { if (e.key === 'Enter') done(true); };
-  $('#dlp-input').focus();
-}
 let dlmOnPick = null;
 function browsePick(start, onPick) { // 通用目录选择弹窗: Choose 时回调绝对路径
   dlmOnPick = onPick;
@@ -1459,13 +1463,6 @@ dlTaskRestore();
 setInterval(() => { // aria2 健康巡检: 状态变化时通知
   if ($('#aria2-url').value.trim()) aria2Check();
 }, 30000);
-const dlCard = $('#dl-list-card');
-if (localStorage.getItem('dl-collapsed') === '1') { dlCard.classList.add('collapsed'); $('#dl-collapse').textContent = '▸'; }
-$('#dl-collapse').addEventListener('click', () => {
-  const c = dlCard.classList.toggle('collapsed');
-  $('#dl-collapse').textContent = c ? '▸' : '▾';
-  localStorage.setItem('dl-collapsed', c ? '1' : '0');
-});
 const concSel = $('#dl-conc');
 concSel.value = localStorage.getItem('dl-conc') || '2';
 concSel.addEventListener('change', () => {

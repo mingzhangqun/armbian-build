@@ -890,21 +890,19 @@ const idbKv = (mode, k, v) => new Promise((res, rej) => { // 轻量 KV(IndexedDB
   rq.onerror = () => rej(rq.error);
 });
 async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权限吊销时才重选
-  if (state.dlRootHandle) {
-    if (await state.dlRootHandle.queryPermission({mode: 'readwrite'}) === 'granted')
-      return state.dlRootHandle;
-    if (await state.dlRootHandle.requestPermission({mode: 'readwrite'}) === 'granted')
-      return state.dlRootHandle;
-    state.dlRootHandle = null;
-  }
+  const okOrPrompt = async h => { // granted 直用; denied 提示并不再弹选择器; prompt 一键确认
+    const p = await h.queryPermission({mode: 'readwrite'});
+    if (p === 'granted') return h;
+    if (p === 'denied') {
+      toast('Folder access blocked — allow access to “' + h.name + '” in the address-bar site settings');
+      throw new Error('permission denied');
+    }
+    if (await h.requestPermission({mode: 'readwrite'}) === 'granted') return h;
+    return null;
+  };
+  if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
   try { state.dlRootHandle = (await idbKv('readonly', 'dlRoot')) || null; } catch (e) {}
-  if (state.dlRootHandle) {
-    if (await state.dlRootHandle.queryPermission({mode: 'readwrite'}) === 'granted')
-      return state.dlRootHandle;
-    if (await state.dlRootHandle.requestPermission({mode: 'readwrite'}) === 'granted')
-      return state.dlRootHandle;
-    state.dlRootHandle = null;
-  }
+  if (state.dlRootHandle) { const r = await okOrPrompt(state.dlRootHandle); if (r) return r; state.dlRootHandle = null; }
   const root = await window.showDirectoryPicker({mode: 'readwrite'});
   state.dlRootHandle = root;
   try { await idbKv('readwrite', 'dlRoot', root); } catch (e) {}
@@ -1262,6 +1260,8 @@ async function pollServerJob(base) { // 轮询 /api/job 直到结束; base 用�
 async function downloadServerTasks(files, reuse) { // 服务端任务: Python 落盘, 无浏览器授权弹窗
   const box = $('#dl-tasks');
   if (box.querySelector('.dl-empty')) box.textContent = '';
+  state.dlMode = 'server'; // 巡检让路, 不再重复打开 Downloading 浮窗
+  const fin = () => { state.dlMode = null; };
   const tasks = reuse || files.map(f => {
     const segs = [state.tag, ...f.path.split('/').map(safeSeg)];
     const t = {id: ++state.dlSeq, segs, name: segs.slice(1).join('/'), url: f.url,
@@ -1286,6 +1286,7 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
     tasks.forEach(t => { t.status = 'error'; t.err = String(e.message).slice(0, 60); dlTaskPaint(t); });
     dlTaskRender(); renderFiles();
     toast('Server download failed: ' + e.message);
+    fin();
     return;
   }
   const byDest = new Map(tasks.map(t => [state.tag + '/' + t.name, t]));
@@ -1312,6 +1313,7 @@ async function downloadServerTasks(files, reuse) { // 服务端任务: Python �
         if (job.status === 'cancelled') toast('Download cancelled');
         else if ((job.errors || []).length) toast('Done, failed ' + job.errors.length + note + ': ' + job.errors[0]);
         else toast('Downloaded → ' + (base ? base + '/' : '') + state.tag + '/ tree' + note);
+        fin();
         return;
       }
     }

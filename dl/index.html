@@ -274,7 +274,9 @@ td.act button:hover{background:var(--chip);color:var(--ink)}
 
 <script>
 'use strict';
-const DEFAULT_URL = 'https://mingzhangqun.github.io/armbian-build/'; // 自家镜像; 请求时自动拼接 data.json
+// 默认数据源 = 本页所在站点去掉 dl/ 后的上级目录(与 images 页同源); fork 部署自动跟随 owner
+const DEFAULT_URL = new URL(location.pathname.replace(/(\/|^)dl(\/index\.html)?\/?$/, '')
+  .replace(/\/+$/, '') + '/', location).href;
 const SLOT_ORDER = ['stable', 'pre-release', 'history'];
 const CAT_ORDER = ['recovery', 'ab', 'loaders'];
 const CAT_LABEL = {recovery: 'Recovery', ab: 'A/B', loaders: 'Loader'};

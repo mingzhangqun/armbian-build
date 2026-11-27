@@ -1352,9 +1352,8 @@ async function downloadAll(files, _retry) { // Add to Downloads: 直接入列, �
         toast('Remembered folder no longer exists — please re-select');
         return downloadAll(files, true);
       }
-      if (e && e.name === 'AbortError') { // 仅首次选择时取消
-        toast('Cancelled. Tip: pick the folder matching Setup → Download ('
-             + ($('#dl-root').value.trim() || '~/Downloads') + ')');
+      if (e && e.name === 'AbortError') { // 仅首次选择时取消; Chrome 拒绝系统目录时也会走到这
+        toast('Tip: don\u2019t select Downloads itself — open it and select the “armbian-imgs” subfolder (create it if missing)');
         return;
       }
       console.warn('structured download failed, falling back:', e);

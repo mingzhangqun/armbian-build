@@ -1150,8 +1150,11 @@ async function aria2RemoveTask(gid) { // 从 aria2 移除任务(活动+历史记
   }
 }
 
-async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件
-  if (t.fctrl) t.fctrl.abort();
+async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件(含 Chrome .crswap 残留)
+  if (t.fctrl) {
+    t.fctrl.abort();
+    await new Promise(r => setTimeout(r, 350)); // 等 writable.abort 落地, 否则 .crswap 残留
+  }
   if (t.status === 'aria2') await aria2RemoveTask(t.gid);
   if (t.status === 'active' && !t.root && state.localServer)
     fetch('/api/job/cancel', {method: 'POST'}); // 服务端任务: 取消整个 job
@@ -1159,8 +1162,11 @@ async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件
     try {
       let dir = t.root;
       for (const sg of t.segs.slice(0, -1)) dir = await dir.getDirectoryHandle(sg);
-      await dir.removeEntry(t.segs[t.segs.length - 1]);
-    } catch (e) { /* 文件不存在等 */ }
+      const name = t.segs[t.segs.length - 1];
+      for (const n of [name, name + '.crswap']) { // 目标文件 + Chrome 写入过程的交换文件
+        try { await dir.removeEntry(n); } catch (e) {}
+      }
+    } catch (e) { /* 目录不存在等 */ }
   }
   state.dlTasks = state.dlTasks.filter(x => x !== t);
   if (t.row) t.row.el.remove();

@@ -42,8 +42,8 @@ body.aria2-on #btn-aria2-push{display:inline-block}
 .cfg-ind input{flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
                border-radius:8px;padding:8px 10px;color:var(--ink)}
 .cfg-ind input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
-#src-input{font-family:var(--mono)}
-#dl-dir,#dl-root{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
+#src-input,#dl-root{font-family:var(--mono)}
+#dl-dir{font-family:var(--mono);flex:1;min-width:200px;font-size:12px;border:1px solid var(--line);
         border-radius:8px;padding:8px 10px;color:var(--ink)}
 #btn-dl-dir{min-width:86px;padding:8px 14px;white-space:nowrap;flex:none}
 /* ---- 目录选择弹窗 ---- */
@@ -229,9 +229,10 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
   <section class="card">
     <h2><i class="step">1</i>Setup</h2>
     <div class="cfg-row"><span class="cfg-k">Download</span>
-      <span class="cfg-v">
-        <input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
-      </span>
+      <span class="cfg-v"><span class="cfg-time" id="dl-root-stat"></span></span>
+    </div>
+    <div class="cfg-row cfg-ind">
+      <input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
     </div>
     <div class="cfg-row cfg-sep"><span class="cfg-k">Source</span>
       <span class="cfg-v"><span class="stat err" id="src-stat">Failed</span>
@@ -911,16 +912,26 @@ async function pickRootDir() { // 仅首次弹窗选择; 句柄记忆(IDB), 权�
   for (const [name, token] of WELL)
     if (dv === '~/' + name || dv.includes('/' + name + '/')) { startIn = token; break; }
   let root = await window.showDirectoryPicker({mode: 'readwrite', startIn});
+  const pickedName = root.name;
   // 所选目录 ≠ Download 配置的末级目录时, 自动进入/创建该子目录作为真实下载根
   const want = ($('#dl-root').value.trim() || '~/Downloads').replace(/\/+$/, '').split('/').pop();
   const WELLN = ['downloads', 'download', 'downloadsfolder'];
+  let sub = '';
   if (want && !WELLN.includes(want.toLowerCase()) && root.name !== want) {
     try {
       root = await root.getDirectoryHandle(want, {create: true});
+      sub = want;
       toast('Download root → …/' + want + '/');
     } catch (e) {}
   }
   state.dlRootHandle = root;
+  $('#dl-root-stat').textContent = root.name; // 当前生效的目录名
+  // 回写 Download 路径(浏览器拿不到绝对路径, 以 ~ 拼接所选目录名, 尽力同步)
+  { const cur = $('#dl-root').value.trim();
+    if (cur.startsWith('~') && pickedName) {
+      const nv = '~/' + pickedName + (sub ? '/' + sub : '');
+      if (nv !== cur) { $('#dl-root').value = nv; localStorage.setItem('dl-root', nv); }
+    } }
   try { await idbKv('readwrite', 'dlRoot', root); } catch (e) {}
   return root;
 }

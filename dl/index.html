@@ -239,7 +239,7 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
         <input id="dl-root" type="text" spellcheck="false" placeholder="~/Downloads">
       </span>
     </div>
-    <div class="cfg-row"><span class="cfg-k">Source</span>
+    <div class="cfg-row cfg-sep"><span class="cfg-k">Source</span>
       <span class="cfg-v"><span class="stat err" id="src-stat">Failed</span>
         <span class="cfg-time" id="refresh-time"></span></span>
     </div>
@@ -281,7 +281,7 @@ if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) document.body
   </section>
 
   <section class="card">
-    <h2><i class="step">5</i>Selected List <span class="sub" id="files-sub"></span>
+    <h2><i class="step">5</i>Selected <span class="sub" id="files-sub"></span>
       <span class="spacer"></span>
       <input id="file-filter" type="search" placeholder="Filter filenames…">
     </h2>
@@ -452,14 +452,15 @@ function typeRows(files, board) {
                      || fi(a) - fi(b) || ki(a.kind) - ki(b.kind));
   return rows;
 }
-function selectedFiles() {
+function selectedFiles() { // 已添加到 Downloads 任务的文件不再出现在 Selected
   const m = manifest(), out = [];
+  const inDl = new Set(state.dlTasks.map(t => t.name));
   for (const [p, url] of Object.entries(m.files || {})) {
     const parts = p.split('/');
     if (parts[0] !== state.board) continue;
     const [cat, flavor, kind] = classify(parts);
     if (!state.checked.has([parts[1], cat, flavor, kind].join('|'))) continue;
-    out.push({path: p, url, size: (m.sizes || {})[p]});
+    if (!inDl.has(p)) out.push({path: p, url, size: (m.sizes || {})[p]});
   }
   out.sort((a, b) => a.path < b.path ? -1 : 1);
   return state.filter
@@ -649,7 +650,12 @@ function renderFiles() {
   for (const id of ['#btn-copy-paths', '#btn-copy-urls', '#btn-curl',
                     '#btn-export', '#btn-aria2-push', '#btn-download'])
     $(id).disabled = !files.length;
-  if (!files.length) { wrap.append(el('div', 'empty', 'No matching files — check image types or adjust the filter')); return; }
+  if (!files.length) {
+    const msg = state.checked.size
+      ? 'All selected files are already in Downloads' : 'No matching files — check image types or adjust the filter';
+    wrap.append(el('div', 'empty', msg));
+    return;
+  }
   const table = el('table');
   const thead = el('thead');
   const hr = el('tr');
@@ -1036,6 +1042,7 @@ async function dlTaskRemove(t) { // 删除任务 + 删除已下载文件
   state.dlTasks = state.dlTasks.filter(x => x !== t);
   if (t.row) t.row.el.remove();
   dlTaskRender();
+  renderFiles();
 }
 
 async function dlTaskRun(t, direct) {
@@ -1105,6 +1112,7 @@ async function downloadStructured(files, direct) {
     added++;
   }
   dlTaskRender();
+  renderFiles();
   state.dlDirect = direct;
   dlPump(direct);
   toast('Queued ' + added + ' tasks → ' + tag + '/ tree');

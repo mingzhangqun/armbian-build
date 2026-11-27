@@ -1468,6 +1468,21 @@ $('#btn-aria2-push').addEventListener('click', async () => { // 无弹窗, 复�
   aria2Push(files, (await dlRootAbs()) || undefined);
 });
 // RPC 配置: 先用上次手动输入(如有), 否则自动从 aria2 配置文件提取; 随后连通性检测
+(async () => { // 预热: 校验记住的下载目录句柄, 已删除/失效则提前清除
+  await new Promise(r => setTimeout(r, 1500)); // 等环境检测与首屏渲染完成
+  let h = null;
+  try { h = (await idbKv('readonly', 'dlRoot')) || null; } catch (e) {}
+  if (!h) return;
+  try {
+    if (await h.queryPermission({mode: 'readwrite'}) !== 'granted') return; // 权限另议, 不清
+    const probe = await h.getDirectoryHandle('.probe', {create: true}); // 真实读写探测
+    await h.removeEntry('.probe');
+  } catch (e) {
+    try { await idbKv('readwrite', 'dlRoot', null); } catch (e2) {}
+    console.info('cleared stale download dir handle:', e && e.name);
+  }
+})();
+
 const envReady = (async () => { // 环境检测: 本地 serve.py(全功能) / 纯静态(GitHub Pages, 降级)
   let local = false;
   try {
